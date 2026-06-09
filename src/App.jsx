@@ -1,0 +1,83 @@
+import { useState, useEffect } from 'react';
+import { Sidebar, BottomNav } from './components/Layout/Sidebar';
+import { Header } from './components/Layout/Header';
+import { ToastContainer } from './components/UI/Toast';
+import { useGASData } from './hooks/useGASData';
+import { useToast } from './hooks/useToast';
+import Dashboard from './pages/Dashboard';
+import Cirugias from './pages/Cirugias';
+import Cobranzas from './pages/Cobranzas';
+import Calendario from './pages/Calendario';
+import Pagos from './pages/Pagos';
+import Consolidado from './pages/Consolidado';
+
+const PAGE_TITLES = {
+  dashboard: 'Dashboard',
+  cirugias: 'Cirugías',
+  cobranzas: 'Cobranzas',
+  calendario: 'Calendario',
+  pagos: 'Pagos / Proveedores',
+  consolidado: 'Consolidado anual',
+};
+
+export default function App() {
+  const [page, setPage] = useState('dashboard');
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const { data, loading, error, refetch } = useGASData();
+  const { toasts, addToast, removeToast } = useToast();
+
+  useEffect(() => {
+    refetch();
+  }, [refetch]);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const pageProps = { data, loading, refetch, addToast };
+
+  const renderPage = () => {
+    switch (page) {
+      case 'dashboard': return <Dashboard {...pageProps} />;
+      case 'cirugias': return <Cirugias {...pageProps} />;
+      case 'cobranzas': return <Cobranzas {...pageProps} />;
+      case 'calendario': return <Calendario {...pageProps} />;
+      case 'pagos': return <Pagos {...pageProps} />;
+      case 'consolidado': return <Consolidado {...pageProps} />;
+      default: return <Dashboard {...pageProps} />;
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', minHeight: '100vh', background: '#F7F8FA', fontFamily: "'DM Sans', sans-serif" }}>
+      {!isMobile && <Sidebar active={page} onNavigate={setPage} />}
+
+      <div style={{ flex: 1, marginLeft: isMobile ? 0 : 220, display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+        <Header title={PAGE_TITLES[page]} onRefresh={refetch} loading={loading} />
+
+        <main style={{ flex: 1, padding: isMobile ? '20px 16px 80px' : '28px 28px' }}>
+          {error && (
+            <div style={{
+              marginBottom: 16, padding: '12px 16px',
+              background: '#FEF2F2', border: '1px solid #FCA5A5',
+              borderRadius: 8, color: '#991B1B', fontSize: 14
+            }}>
+              <strong>Error al cargar datos:</strong> {error}
+              {!import.meta.env.VITE_GAS_URL && (
+                <div style={{ marginTop: 6, fontSize: 13 }}>
+                  Configurá <code>VITE_GAS_URL</code> en el archivo <code>.env</code> con la URL de tu Google Apps Script.
+                </div>
+              )}
+            </div>
+          )}
+          {renderPage()}
+        </main>
+      </div>
+
+      {isMobile && <BottomNav active={page} onNavigate={setPage} />}
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
+    </div>
+  );
+}
