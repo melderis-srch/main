@@ -4,15 +4,16 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { parseDate, formatMonthYear } from '../utils/formatters';
 import { CirugiaModal } from './Cirugias';
 import { addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, format } from 'date-fns';
-import { es } from 'date-fns/locale';
 
 const DAYS = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa', 'Do'];
 
-function getChipColor(c) {
+function cirugiaChipColor(c) {
   if (c.cobrado) return { bg: '#D1FAE5', color: '#065F46', border: '#6EE7B7' };
   if (c.numeroFactura || c.montoFactura) return { bg: '#FEF3C7', color: '#92400E', border: '#FCD34D' };
-  return { bg: '#F3F4F6', color: '#6B7280', border: '#E5E7EB' };
+  return { bg: '#F3F4F6', color: '#374151', border: '#E5E7EB' };
 }
+
+const COBRO_CHIP = { bg: '#EFF6FF', color: '#1E40AF', border: '#BFDBFE' };
 
 function abbrev(str) {
   if (!str) return '?';
@@ -21,7 +22,7 @@ function abbrev(str) {
 }
 
 export default function Calendario({ data, loading, addToast, refetch }) {
-  const { cirugias } = data;
+  const { cirugias, ventasCobros } = data;
   const [current, setCurrent] = useState(new Date());
   const [selected, setSelected] = useState(null);
 
@@ -31,25 +32,35 @@ export default function Calendario({ data, loading, addToast, refetch }) {
   const calEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
   const days = eachDayOfInterval({ start: calStart, end: calEnd });
 
-  // Map cirugías by date string
   const byDate = useMemo(() => {
     const map = {};
+
     cirugias.forEach(c => {
       if (!c.fechaCx) return;
       const d = parseDate(c.fechaCx);
       if (!d) return;
       const key = format(d, 'yyyy-MM-dd');
-      if (!map[key]) map[key] = [];
-      map[key].push(c);
+      if (!map[key]) map[key] = { cirugias: [], cobros: [] };
+      map[key].cirugias.push(c);
     });
+
+    (ventasCobros || []).forEach(v => {
+      if (v.fechaCobroReal) return; // already collected, skip
+      if (!v.fechaCobroEsperada) return;
+      const d = parseDate(v.fechaCobroEsperada);
+      if (!d) return;
+      const key = format(d, 'yyyy-MM-dd');
+      if (!map[key]) map[key] = { cirugias: [], cobros: [] };
+      map[key].cobros.push(v);
+    });
+
     return map;
-  }, [cirugias]);
+  }, [cirugias, ventasCobros]);
 
   const today = new Date();
 
   return (
     <div>
-      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20 }}>
         <button onClick={() => setCurrent(d => subMonths(d, 1))}
           style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 8, padding: '7px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
@@ -66,11 +77,24 @@ export default function Calendario({ data, loading, addToast, refetch }) {
           style={{ padding: '7px 14px', background: '#F3F4F6', border: '1px solid #E5E7EB', borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, color: '#374151' }}>
           Hoy
         </button>
+
+        {/* Legend */}
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 14, alignItems: 'center' }}>
+          {[
+            { bg: '#F3F4F6', border: '#E5E7EB', color: '#374151', label: 'Cirugía' },
+            { bg: '#FEF3C7', border: '#FCD34D', color: '#92400E', label: 'Facturada' },
+            { bg: '#D1FAE5', border: '#6EE7B7', color: '#065F46', label: 'Cobrada' },
+            { bg: '#EFF6FF', border: '#BFDBFE', color: '#1E40AF', label: 'Cobro esperado' },
+          ].map(l => (
+            <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <div style={{ width: 12, height: 12, borderRadius: 3, background: l.bg, border: `1px solid ${l.border}` }} />
+              <span style={{ fontSize: 12, color: '#6B7280' }}>{l.label}</span>
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* Calendar grid */}
       <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, overflow: 'hidden' }}>
-        {/* Day headers */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: '1px solid #E5E7EB' }}>
           {DAYS.map(d => (
             <div key={d} style={{ padding: '10px 0', textAlign: 'center', fontSize: 12, fontWeight: 600, color: '#9CA3AF', background: '#F9FAFB' }}>
@@ -79,14 +103,14 @@ export default function Calendario({ data, loading, addToast, refetch }) {
           ))}
         </div>
 
-        {/* Day cells */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
           {days.map((day, idx) => {
             const key = format(day, 'yyyy-MM-dd');
-            const events = byDate[key] || [];
+            const { cirugias: cxList = [], cobros: cobroList = [] } = byDate[key] || {};
             const inMonth = isSameMonth(day, current);
             const isToday = isSameDay(day, today);
             const isLastRow = idx >= days.length - 7;
+            const totalEvents = cxList.length + cobroList.length;
             return (
               <div key={key} style={{
                 minHeight: 100,
@@ -106,10 +130,10 @@ export default function Calendario({ data, loading, addToast, refetch }) {
                   {format(day, 'd')}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  {events.slice(0, 3).map((c, i) => {
-                    const chip = getChipColor(c);
+                  {cxList.slice(0, 2).map((c, i) => {
+                    const chip = cirugiaChipColor(c);
                     return (
-                      <button key={i} onClick={() => setSelected(c)}
+                      <button key={'cx' + i} onClick={() => setSelected(c)}
                         style={{
                           display: 'block', width: '100%', padding: '2px 5px',
                           background: chip.bg, color: chip.color,
@@ -119,12 +143,26 @@ export default function Calendario({ data, loading, addToast, refetch }) {
                           textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
                         }}
                       >
-                        {abbrev(c.paciente)} {c.obraSocial ? '· ' + c.obraSocial.split(' ')[0] : ''}
+                        {abbrev(c.paciente)}{c.obraSocial ? ' · ' + c.obraSocial.split(' ')[0] : ''}
                       </button>
                     );
                   })}
-                  {events.length > 3 && (
-                    <span style={{ fontSize: 10, color: '#9CA3AF', paddingLeft: 4 }}>+{events.length - 3} más</span>
+                  {cobroList.slice(0, 2).map((v, i) => (
+                    <div key={'cobro' + i}
+                      style={{
+                        padding: '2px 5px',
+                        background: COBRO_CHIP.bg, color: COBRO_CHIP.color,
+                        border: `1px solid ${COBRO_CHIP.border}`,
+                        borderRadius: 4, fontSize: 11, fontWeight: 500,
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                      }}
+                      title={`${v.obraSocial || v.paciente} — ${v.montoFacturado}`}
+                    >
+                      💰 {v.obraSocial ? v.obraSocial.split(' ')[0] : abbrev(v.paciente)}
+                    </div>
+                  ))}
+                  {totalEvents > 4 && (
+                    <span style={{ fontSize: 10, color: '#9CA3AF', paddingLeft: 4 }}>+{totalEvents - 4} más</span>
                   )}
                 </div>
               </div>

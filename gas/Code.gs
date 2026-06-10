@@ -2,7 +2,7 @@
 // Surcherie Implantes Quirúrgicos - Google Apps Script Backend
 // ============================================================
 
-var CIRUCIAS_SHEET_ID = '1ZMNbsQRzzJScaIP2JB7tJmy8cEafVqHuCDgZGOiFq-M';
+var CIRUCIAS_SHEET_ID  = '1ZMNbsQRzzJScaIP2JB7tJmy8cEafVqHuCDgZGOiFq-M';
 var FINANCIERO_SHEET_ID = '1Qy7ylSFMy8-zOCMuGS7B6JUQ8K2BisuDX1WFB5bO-9E';
 
 function makeResponse(data) {
@@ -11,8 +11,25 @@ function makeResponse(data) {
 }
 
 function doOptions(e) {
-  return ContentService.createTextOutput('')
-    .setMimeType(ContentService.MimeType.TEXT);
+  return ContentService.createTextOutput('').setMimeType(ContentService.MimeType.TEXT);
+}
+
+// Busca una hoja por nombre ignorando tildes y mayúsculas
+function findSheet(ss, name) {
+  var sheet = ss.getSheetByName(name);
+  if (sheet) return sheet;
+  function normalize(s) {
+    return s.toLowerCase()
+      .replace(/[áàâä]/g,'a').replace(/[éèêë]/g,'e')
+      .replace(/[íìîï]/g,'i').replace(/[óòôö]/g,'o')
+      .replace(/[úùûü]/g,'u').replace(/\s+/g,'');
+  }
+  var target = normalize(name);
+  var sheets = ss.getSheets();
+  for (var i = 0; i < sheets.length; i++) {
+    if (normalize(sheets[i].getName()) === target) return sheets[i];
+  }
+  return null;
 }
 
 // ============================================================
@@ -22,11 +39,12 @@ function doGet(e) {
   try {
     var action = e.parameter.action;
     var result;
-    if (action === 'getCirugias')      result = getCirugias();
-    else if (action === 'getConsolidado')   result = getConsolidado();
-    else if (action === 'getVentasCobros')  result = getVentasCobros();
-    else if (action === 'getGastosPagos')   result = getGastosPagos();
-    else result = { error: 'Acción no reconocida: ' + action };
+    if      (action === 'getCirugias')     result = getCirugias();
+    else if (action === 'getConsolidado')  result = getConsolidado();
+    else if (action === 'getVentasCobros') result = getVentasCobros();
+    else if (action === 'getGastosPagos')  result = getGastosPagos();
+    else if (action === 'getSheetNames')   result = getSheetNames();
+    else result = { error: 'Accion no reconocida: ' + action };
     return makeResponse({ success: true, data: result });
   } catch (err) {
     return makeResponse({ success: false, error: err.toString() });
@@ -40,13 +58,13 @@ function doPost(e) {
   try {
     var body = JSON.parse(e.postData.contents);
     var action = body.action;
-    var data = body.data;
+    var data   = body.data;
     var result;
-    if (action === 'updateCobrado')      result = updateCobrado(data.rowIndex, data.fechaCobro);
-    else if (action === 'updatePagado')  result = updatePagado(data.rowIndex);
-    else if (action === 'addCirugia')    result = addCirugia(data);
-    else if (action === 'registrarCobro') result = registrarCobro(data);
-    else result = { error: 'Acción no reconocida: ' + action };
+    if      (action === 'updateCobrado')   result = updateCobrado(data.rowIndex, data.fechaCobro);
+    else if (action === 'updatePagado')    result = updatePagado(data.rowIndex);
+    else if (action === 'addCirugia')      result = addCirugia(data);
+    else if (action === 'registrarCobro')  result = registrarCobro(data);
+    else result = { error: 'Accion no reconocida: ' + action };
     return makeResponse({ success: true, data: result });
   } catch (err) {
     return makeResponse({ success: false, error: err.toString() });
@@ -54,35 +72,48 @@ function doPost(e) {
 }
 
 // ============================================================
-// READ FUNCTIONS
+// HELPERS
 // ============================================================
-
 function formatFecha(val) {
   if (!val) return '';
   try {
-    var d = new Date(val);
+    var d = (val instanceof Date) ? val : new Date(val);
     if (isNaN(d.getTime())) return String(val);
     return Utilities.formatDate(d, Session.getScriptTimeZone(), 'dd/MM/yyyy');
   } catch(e) { return String(val); }
 }
 
-// Hoja "Cirugías":
-// Col: 1=Paciente, 2=Medico, 3=Fecha cx, 4=Mes, 5=Pedido/presupuestado,
-//      6=Obra Social, 7=Consumo, 8=Valor implantes, 9=Valor descartables,
-//      10=Valor logística, 11=Corrección gastos, 12=Valor total,
-//      13=Monto presupuesto, 14=Número de Factura, 15=Monto Factura,
-//      16=Fecha factura, 17=Fecha cobro, 18=Cobrado,
-//      19=Retenciones/otros, 20=Diferencia consumo, 21=Factura-Gastos, 22=%
+// Debug: lista nombres exactos de todas las hojas
+function getSheetNames() {
+  var result = {};
+  var ss1 = SpreadsheetApp.openById(CIRUCIAS_SHEET_ID);
+  result.cirugiasSheets = ss1.getSheets().map(function(s){ return s.getName(); });
+  var ss2 = SpreadsheetApp.openById(FINANCIERO_SHEET_ID);
+  result.financieroSheets = ss2.getSheets().map(function(s){ return s.getName(); });
+  return result;
+}
+
+// ============================================================
+// READ — Cirugías
+// Col: 1=Paciente 2=Medico 3=FechaCx 4=Mes 5=Pedido 6=ObraSocial
+//      7=Consumo 8=Implantes 9=Descartables 10=Logistica
+//      11=CorreccionGastos 12=ValorTotal 13=MontoPresupuesto
+//      14=NroFactura 15=MontoFactura 16=FechaFactura
+//      17=FechaCobro 18=Cobrado 19=Retenciones
+//      20=DifConsumo 21=FacturaGastos 22=%Margen
+// ============================================================
 function getCirugias() {
-  var ss = SpreadsheetApp.openById(CIRUCIAS_SHEET_ID);
-  var sheet = ss.getSheetByName('Cirugías');
+  var ss    = SpreadsheetApp.openById(CIRUCIAS_SHEET_ID);
+  var sheet = findSheet(ss, 'Cirugías');
+  if (!sheet) throw new Error('No se encontró la hoja "Cirugías". Hojas disponibles: ' +
+    ss.getSheets().map(function(s){return s.getName();}).join(', '));
   var data = sheet.getDataRange().getValues();
   var rows = [];
   for (var i = 1; i < data.length; i++) {
     var r = data[i];
     if (!r[0] && !r[1] && !r[2]) continue;
     rows.push({
-      rowIndex: i + 1,
+      rowIndex:            i + 1,
       paciente:            r[0]  || '',
       medico:              r[1]  || '',
       fechaCx:             formatFecha(r[2]),
@@ -96,11 +127,11 @@ function getCirugias() {
       correccionGastos:    r[10] || '',
       valorTotalCostos:    r[11] || '',
       montoPresupuesto:    r[12] || '',
-      numeroFactura:       r[13] || '',
+      numeroFactura:       String(r[13] || ''),
       montoFactura:        r[14] || '',
       fechaFactura:        formatFecha(r[15]),
-      fechaCobro:          formatFecha(r[16]),  // Col 17: Fecha cobro (real)
-      cobrado:             r[17] === true || r[17] === 'TRUE' || r[17] === 'true',
+      fechaCobro:          formatFecha(r[16]),
+      cobrado:             r[17] === true || String(r[17]).toUpperCase() === 'TRUE',
       retencionesOtros:    r[18] || '',
       diferenciaConsumo:   r[19] || '',
       facturaGastos:       r[20] || '',
@@ -110,170 +141,193 @@ function getCirugias() {
   return rows;
 }
 
-// Hoja "Consolidado": estructura pivotada
-// Fila 1: col A = "Cantidad de cirugías", cols B+ = meses (ej: "Enero/31")
-// Filas siguientes: col A = nombre de métrica, cols B+ = valores por mes
+// ============================================================
+// READ — Consolidado (tabla pivotada: filas=métricas, columnas=meses)
+// Filas conocidas:
+//   "Cantidad de cirugías"
+//   "$Factura Mes Cx Mes corriente"
+//   "$Factura Mes Cx Mes Anterior"
+//   "Monto Facturado TOTAL"
+//   "Costos Cirugias"
+//   "Monto Recolectado"
+//   "Gastos Proveedores"
+//   "Otros gastos"
+//   "Total Gastos"
+//   "%recolección"
+//   "%rentabilidad x mes"
+// ============================================================
 function getConsolidado() {
-  var ss = SpreadsheetApp.openById(CIRUCIAS_SHEET_ID);
-  var sheet = ss.getSheetByName('Consolidado');
+  var ss    = SpreadsheetApp.openById(CIRUCIAS_SHEET_ID);
+  var sheet = findSheet(ss, 'Consolidado');
+  if (!sheet) throw new Error('No se encontró la hoja "Consolidado". Hojas disponibles: ' +
+    ss.getSheets().map(function(s){return s.getName();}).join(', '));
+
   var data = sheet.getDataRange().getValues();
 
-  // Encontrar la fila de encabezado (contiene "cantidad" en col A)
+  // Encontrar fila encabezado (tiene "cantidad" en col A)
   var headerRow = -1;
   for (var i = 0; i < data.length; i++) {
-    if (data[i][0] && String(data[i][0]).toLowerCase().indexOf('cantidad') !== -1) {
-      headerRow = i;
-      break;
+    if (String(data[i][0]).toLowerCase().indexOf('cantidad') !== -1) {
+      headerRow = i; break;
     }
   }
   if (headerRow === -1) return [];
 
-  // Extraer columnas de meses desde la fila de encabezado
+  // Extraer meses desde la fila de encabezado (col B en adelante)
   var months = [];
   for (var j = 1; j < data[headerRow].length; j++) {
     var cell = String(data[headerRow][j] || '').trim();
     if (!cell) continue;
-    // "Enero/31" → nombre = "Enero", cantidad en header
-    var monthName = cell.split('/')[0].trim();
-    months.push({ colIndex: j, name: monthName });
+    months.push({ col: j, name: cell.split('/')[0].trim() });
   }
 
-  // Mapear filas por su etiqueta en col A (desde la fila de encabezado en adelante)
+  // Mapear filas por etiqueta normalizada
+  function norm(s) { return String(s).toLowerCase().replace(/\s+/g,' ').trim(); }
   var rowMap = {};
   for (var i = headerRow; i < data.length; i++) {
-    var label = String(data[i][0] || '').trim().toLowerCase();
-    if (label) rowMap[label] = i;
+    var lbl = norm(data[i][0]);
+    if (lbl) rowMap[lbl] = i;
   }
 
-  // Construir resultado como array de objetos por mes
+  function findRow(keywords) {
+    for (var lbl in rowMap) {
+      var match = true;
+      for (var k = 0; k < keywords.length; k++) {
+        if (lbl.indexOf(keywords[k]) === -1) { match = false; break; }
+      }
+      if (match) return rowMap[lbl];
+    }
+    return -1;
+  }
+
+  var riCantidad    = findRow(['cantidad']);
+  var riCorriente   = findRow(['corriente']);
+  var riAnterior    = findRow(['anterior']);
+  var riTotalFact   = findRow(['monto facturado']);
+  var riCostos      = findRow(['costos']);
+  var riRecolectado = findRow(['recolectado']);
+  var riProveed     = findRow(['proveedores']);
+  var riOtros       = findRow(['otros gastos']);
+  var riTotalGastos = findRow(['total gastos']);
+  var riPctRec      = findRow(['recolec']);
+  var riPctRent     = findRow(['rentab']);
+
+  function val(ri, col) {
+    if (ri === -1) return '';
+    return data[ri][col] !== undefined ? data[ri][col] : '';
+  }
+
   var result = [];
   for (var m = 0; m < months.length; m++) {
-    var col = months[m].colIndex;
-    var obj = {
-      mes:                    months[m].name,
-      cantidadCirugias:       '',
-      facturasMesCorriente:   '',
-      facturasMesAnterior:    '',
-      montoFacturadoTotal:    '',
-      costosCirugias:         '',
-      montoRecolectado:       '',
-      gastosProveedores:      '',
-      otrosGastos:            '',
-      totalGastos:            '',
-      pctRecoleccion:         '',
-      pctRentabilidad:        ''
-    };
-
-    for (var label in rowMap) {
-      var ri = rowMap[label];
-      var val = data[ri][col];
-      if (val === '' || val === null || val === undefined) val = '';
-      if      (label.indexOf('cantidad') !== -1)                        obj.cantidadCirugias = val;
-      else if (label.indexOf('corriente') !== -1)                       obj.facturasMesCorriente = val;
-      else if (label.indexOf('anterior') !== -1)                        obj.facturasMesAnterior = val;
-      else if (label.indexOf('monto facturado') !== -1 || label.indexOf('total') !== -1) obj.montoFacturadoTotal = val;
-      else if (label.indexOf('costos') !== -1)                          obj.costosCirugias = val;
-      else if (label.indexOf('recolect') !== -1 || label.indexOf('cobrado') !== -1) obj.montoRecolectado = val;
-      else if (label.indexOf('proveedores') !== -1)                     obj.gastosProveedores = val;
-      else if (label.indexOf('otros gastos') !== -1)                    obj.otrosGastos = val;
-      else if (label.indexOf('total gastos') !== -1)                    obj.totalGastos = val;
-      else if (label.indexOf('recolec') !== -1 && label.indexOf('%') !== -1) obj.pctRecoleccion = val;
-      else if (label.indexOf('rentab') !== -1)                          obj.pctRentabilidad = val;
-    }
-
-    result.push(obj);
+    var col = months[m].col;
+    result.push({
+      mes:                  months[m].name,
+      cantidadCirugias:     val(riCantidad,    col),
+      facturasMesCorriente: val(riCorriente,   col),
+      facturasMesAnterior:  val(riAnterior,    col),
+      montoFacturadoTotal:  val(riTotalFact,   col),
+      costosCirugias:       val(riCostos,      col),
+      montoRecolectado:     val(riRecolectado, col),
+      gastosProveedores:    val(riProveed,     col),
+      otrosGastos:          val(riOtros,       col),
+      totalGastos:          val(riTotalGastos, col),
+      pctRecoleccion:       val(riPctRec,      col),
+      pctRentabilidad:      val(riPctRent,     col)
+    });
   }
   return result;
 }
 
-// Hoja "VENTASCOBROS":
-// Col: 1=Paciente, 2=Obra social, 3=N° Factura, 4=Monto facturado,
-//      5=Fecha factura, 6=Ret. ganancias, 7=Ret. IIBB, 8=Ret. Sellados,
-//      9=Monto Cobrado, 10=Medio de pago, 11=Lugar de pago,
-//      12=Condición de pago, 13=Fecha de cobro (esperada),
-//      14=Fecha de cobro REAL, 15=Fecha de cobro cheque
+// ============================================================
+// READ — VENTASCOBROS
+// Col: 1=Paciente 2=ObraSocial 3=NroFactura 4=MontoFacturado
+//      5=FechaFactura 6=RetGanancias 7=RetIIBB 8=RetSellados
+//      9=MontoCobrado 10=MedioPago 11=LugarPago 12=CondicionPago
+//      13=FechaCobroEsperada 14=FechaCobroReal 15=FechaCobroCheque
+// ============================================================
 function getVentasCobros() {
-  var ss = SpreadsheetApp.openById(FINANCIERO_SHEET_ID);
-  var sheet = ss.getSheetByName('VENTASCOBROS');
+  var ss    = SpreadsheetApp.openById(FINANCIERO_SHEET_ID);
+  var sheet = findSheet(ss, 'VENTASCOBROS');
+  if (!sheet) throw new Error('No se encontró la hoja "VENTASCOBROS". Hojas disponibles: ' +
+    ss.getSheets().map(function(s){return s.getName();}).join(', '));
   var data = sheet.getDataRange().getValues();
   var rows = [];
   for (var i = 1; i < data.length; i++) {
     var r = data[i];
     if (!r[0] && !r[2]) continue;
     rows.push({
-      rowIndex:             i + 1,
-      paciente:             r[0]  || '',
-      obraSocial:           r[1]  || '',
-      nroFactura:           r[2]  || '',
-      montoFacturado:       r[3]  || '',
-      fechaFactura:         formatFecha(r[4]),
-      retGanancias:         r[5]  || '',
-      retIIBB:              r[6]  || '',
-      retSellados:          r[7]  || '',
-      montoCobrado:         r[8]  || '',
-      medioPago:            r[9]  || '',
-      lugarPago:            r[10] || '',
-      condicionPago:        r[11] || '',
-      fechaCobroEsperada:   formatFecha(r[12]),  // Col 13: Fecha de cobro (esperada)
-      fechaCobroReal:       formatFecha(r[13]),  // Col 14: Fecha de cobro REAL
-      fechaCobroCheque:     formatFecha(r[14])   // Col 15: Fecha de cobro cheque
+      rowIndex:           i + 1,
+      paciente:           r[0]  || '',
+      obraSocial:         r[1]  || '',
+      nroFactura:         String(r[2] || ''),
+      montoFacturado:     r[3]  || '',
+      fechaFactura:       formatFecha(r[4]),
+      retGanancias:       r[5]  || '',
+      retIIBB:            r[6]  || '',
+      retSellados:        r[7]  || '',
+      montoCobrado:       r[8]  || '',
+      medioPago:          r[9]  || '',
+      lugarPago:          r[10] || '',
+      condicionPago:      r[11] || '',
+      fechaCobroEsperada: formatFecha(r[12]),
+      fechaCobroReal:     formatFecha(r[13]),
+      fechaCobroCheque:   formatFecha(r[14])
     });
   }
   return rows;
 }
 
-// Hoja "GASTOSPAGOS":
-// Col: 1=Fecha emisión, 2=N° Factura, 3=Monto, 4=Emisor, 5=Categorias,
-//      6=Descripción, 7=Fecha de pago, 8=Pago (TRUE/FALSE),
-//      9=Forma de pago, 10=Comprobante enviado, 11=Recibo, 12=Reclamos
+// ============================================================
+// READ — GASTOSPAGOS
+// Col: 1=FechaEmision 2=NroFactura 3=Monto 4=Emisor 5=Categoria
+//      6=Descripcion 7=FechaPago 8=Pago(bool) 9=FormaPago
+//      10=ComprobanteEnviado 11=Recibo 12=Reclamos
+// ============================================================
 function getGastosPagos() {
-  var ss = SpreadsheetApp.openById(FINANCIERO_SHEET_ID);
-  var sheet = ss.getSheetByName('GASTOSPAGOS');
+  var ss    = SpreadsheetApp.openById(FINANCIERO_SHEET_ID);
+  var sheet = findSheet(ss, 'GASTOSPAGOS');
+  if (!sheet) throw new Error('No se encontró la hoja "GASTOSPAGOS". Hojas disponibles: ' +
+    ss.getSheets().map(function(s){return s.getName();}).join(', '));
   var data = sheet.getDataRange().getValues();
   var rows = [];
   for (var i = 1; i < data.length; i++) {
     var r = data[i];
     if (!r[0] && !r[1]) continue;
     rows.push({
-      rowIndex:             i + 1,
-      fechaEmision:         formatFecha(r[0]),
-      nroFactura:           r[1]  || '',
-      monto:                r[2]  || '',
-      emisor:               r[3]  || '',
-      categoria:            r[4]  || '',
-      descripcion:          r[5]  || '',
-      fechaPago:            formatFecha(r[6]),
-      pagado:               r[7] === true || r[7] === 'TRUE' || r[7] === 'true',
-      formaPago:            r[8]  || '',
-      comprobanteEnviado:   r[9]  || '',
-      recibo:               r[10] || '',
-      reclamos:             r[11] || ''
+      rowIndex:           i + 1,
+      fechaEmision:       formatFecha(r[0]),
+      nroFactura:         String(r[1] || ''),
+      monto:              r[2]  || '',
+      emisor:             r[3]  || '',
+      categoria:          r[4]  || '',
+      descripcion:        r[5]  || '',
+      fechaPago:          formatFecha(r[6]),
+      pagado:             r[7] === true || String(r[7]).toUpperCase() === 'TRUE',
+      formaPago:          r[8]  || '',
+      comprobanteEnviado: r[9]  || '',
+      recibo:             r[10] || '',
+      reclamos:           r[11] || ''
     });
   }
   return rows;
 }
 
 // ============================================================
-// WRITE FUNCTIONS
+// WRITE
 // ============================================================
-
-// updateCobrado: marca cirugía como cobrada
-// Col 18 (idx 17) = Cobrado, Col 17 (idx 16) = Fecha cobro
 function updateCobrado(rowIndex, fechaCobro) {
-  var ss = SpreadsheetApp.openById(CIRUCIAS_SHEET_ID);
-  var sheet = ss.getSheetByName('Cirugías');
+  var ss    = SpreadsheetApp.openById(CIRUCIAS_SHEET_ID);
+  var sheet = findSheet(ss, 'Cirugías');
+  if (!sheet) throw new Error('Hoja Cirugías no encontrada');
   sheet.getRange(rowIndex, 18).setValue(true);
-  if (fechaCobro) {
-    sheet.getRange(rowIndex, 17).setValue(fechaCobro);
-  }
+  if (fechaCobro) sheet.getRange(rowIndex, 17).setValue(fechaCobro);
   return { updated: rowIndex };
 }
 
-// updatePagado: marca gasto como pagado
-// Col 8 (idx 7) = Pago, Col 7 (idx 6) = Fecha de pago
 function updatePagado(rowIndex) {
-  var ss = SpreadsheetApp.openById(FINANCIERO_SHEET_ID);
-  var sheet = ss.getSheetByName('GASTOSPAGOS');
+  var ss    = SpreadsheetApp.openById(FINANCIERO_SHEET_ID);
+  var sheet = findSheet(ss, 'GASTOSPAGOS');
+  if (!sheet) throw new Error('Hoja GASTOSPAGOS no encontrada');
   sheet.getRange(rowIndex, 8).setValue(true);
   sheet.getRange(rowIndex, 7).setValue(
     Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy')
@@ -282,52 +336,31 @@ function updatePagado(rowIndex) {
 }
 
 function addCirugia(data) {
-  var ss = SpreadsheetApp.openById(CIRUCIAS_SHEET_ID);
-  var sheet = ss.getSheetByName('Cirugías');
+  var ss    = SpreadsheetApp.openById(CIRUCIAS_SHEET_ID);
+  var sheet = findSheet(ss, 'Cirugías');
+  if (!sheet) throw new Error('Hoja Cirugías no encontrada');
   sheet.appendRow([
-    data.paciente            || '',
-    data.medico              || '',
-    data.fechaCx             || '',
-    data.mes                 || '',
-    data.pedidoPresupuestado || '',
-    data.obraSocial          || '',
-    data.consumo             || '',
-    data.valorImplantes      || '',
-    data.valorDescartables   || '',
-    data.valorLogistica      || '',
-    data.correccionGastos    || '',
-    data.valorTotalCostos    || '',
-    data.montoPresupuesto    || '',
-    data.numeroFactura       || '',
-    data.montoFactura        || '',
-    data.fechaFactura        || '',
-    data.fechaCobro          || '',
-    false,
-    data.retencionesOtros    || '',
-    '', '', ''  // columnas calculadas por fórmulas del sheet
+    data.paciente||'', data.medico||'', data.fechaCx||'', data.mes||'',
+    data.pedidoPresupuestado||'', data.obraSocial||'', data.consumo||'',
+    data.valorImplantes||'', data.valorDescartables||'', data.valorLogistica||'',
+    data.correccionGastos||'', data.valorTotalCostos||'', data.montoPresupuesto||'',
+    data.numeroFactura||'', data.montoFactura||'', data.fechaFactura||'',
+    data.fechaCobro||'', false, data.retencionesOtros||'', '', '', ''
   ]);
   return { appended: true };
 }
 
 function registrarCobro(data) {
-  var ss = SpreadsheetApp.openById(FINANCIERO_SHEET_ID);
-  var sheet = ss.getSheetByName('VENTASCOBROS');
+  var ss    = SpreadsheetApp.openById(FINANCIERO_SHEET_ID);
+  var sheet = findSheet(ss, 'VENTASCOBROS');
+  if (!sheet) throw new Error('Hoja VENTASCOBROS no encontrada');
   sheet.appendRow([
-    data.paciente           || '',
-    data.obraSocial         || '',
-    data.nroFactura         || '',
-    data.montoFacturado     || '',
-    data.fechaFactura       || '',
-    data.retGanancias       || '',
-    data.retIIBB            || '',
-    data.retSellados        || '',
-    data.montoCobrado       || '',
-    data.medioPago          || '',
-    data.lugarPago          || '',
-    data.condicionPago      || '',
-    data.fechaCobroEsperada || '',
-    data.fechaCobroReal     || '',
-    data.fechaCobroCheque   || ''
+    data.paciente||'', data.obraSocial||'', data.nroFactura||'',
+    data.montoFacturado||'', data.fechaFactura||'',
+    data.retGanancias||'', data.retIIBB||'', data.retSellados||'',
+    data.montoCobrado||'', data.medioPago||'', data.lugarPago||'',
+    data.condicionPago||'', data.fechaCobroEsperada||'',
+    data.fechaCobroReal||'', data.fechaCobroCheque||''
   ]);
   return { appended: true };
 }
