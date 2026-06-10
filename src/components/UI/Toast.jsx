@@ -1,3 +1,4 @@
+'use client';
 import { CheckCircle, XCircle, X } from 'lucide-react';
 
 export function ToastContainer({ toasts, onRemove }) {

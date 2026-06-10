@@ -1,4 +1,4 @@
-const BASE_URL = import.meta.env.VITE_GAS_URL;
+const BASE_URL = process.env.NEXT_PUBLIC_GAS_URL;
 
 async function gasGet(action) {
   if (!BASE_URL) throw new Error('VITE_GAS_URL no configurada');

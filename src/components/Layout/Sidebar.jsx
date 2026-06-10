@@ -1,3 +1,4 @@
+'use client';
 import { LayoutDashboard, Stethoscope, CreditCard, Calendar, Receipt, BarChart2 } from 'lucide-react';
 
 const NAV = [

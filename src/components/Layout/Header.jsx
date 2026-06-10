@@ -1,3 +1,4 @@
+'use client';
 import { RefreshCw } from 'lucide-react';
 
 export function Header({ title, onRefresh, loading }) {
