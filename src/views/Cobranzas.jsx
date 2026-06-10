@@ -134,7 +134,7 @@ export default function Cobranzas({ data, loading, refetch, addToast }) {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
             <thead>
               <tr style={{ background: '#F9FAFB', borderBottom: '1px solid #E5E7EB' }}>
-                {['Paciente', 'Obra Social', 'N° Factura', 'Monto Fact.', 'Retenciones', 'Monto Neto', 'Medio Pago', 'F. Esperada', 'F. Real', 'Días mora', 'Estado'].map(h => (
+                {['Paciente', 'Obra Social', 'N° Factura', 'Monto Fact.', 'Retenciones', 'Monto Neto', 'Medio Pago', 'F. Esperada', 'F. Real', 'F. Cheque', 'Días mora', 'Estado'].map(h => (
                   <th key={h} style={{ padding: '11px 14px', textAlign: 'left', fontWeight: 600, color: '#374151', fontSize: 12, whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
@@ -158,6 +158,7 @@ export default function Cobranzas({ data, loading, refetch, addToast }) {
                         <td style={{ padding: '10px 14px', color: '#6B7280' }}>{v.medioPago}</td>
                         <td style={{ padding: '10px 14px', color: '#6B7280', whiteSpace: 'nowrap' }}>{v.fechaCobroEsperada}</td>
                         <td style={{ padding: '10px 14px', color: '#059669', whiteSpace: 'nowrap' }}>{v.fechaCobroReal}</td>
+                        <td style={{ padding: '10px 14px', color: '#6B7280', whiteSpace: 'nowrap' }}>{v.fechaCobroCheque}</td>
                         <td style={{ padding: '10px 14px', fontFamily: 'DM Mono, monospace', fontSize: 13, color: mora > 0 ? '#DC2626' : '#6B7280' }}>
                           {mora !== null ? (mora > 0 ? `+${mora}d` : mora < 0 ? `${mora}d` : 'Hoy') : '—'}
                         </td>

@@ -29,8 +29,8 @@ export const gasClient = {
   getVentasCobros: () => gasGet('getVentasCobros'),
   getGastosPagos: () => gasGet('getGastosPagos'),
 
-  updateCobrado: (rowIndex, fechaCobroReal) =>
-    gasPost('updateCobrado', { rowIndex, fechaCobroReal }),
+  updateCobrado: (rowIndex, fechaCobro) =>
+    gasPost('updateCobrado', { rowIndex, fechaCobro }),
 
   updatePagado: (rowIndex) =>
     gasPost('updatePagado', { rowIndex }),

@@ -113,7 +113,7 @@ function CirugiaModal({ cirugia, onClose, onCobrar, addToast }) {
           <InfoChip label="Monto factura" value={cirugia.montoFactura ? formatARS(parseArgMoney(cirugia.montoFactura)) : ''} />
           <InfoChip label="N° Factura" value={cirugia.numeroFactura} />
           <InfoChip label="Fecha factura" value={cirugia.fechaFactura} />
-          <InfoChip label="Fecha cobro esperada" value={cirugia.fechaCobroEsperada} />
+          <InfoChip label="Fecha cobro" value={cirugia.fechaCobro} />
           <InfoChip label="Retenciones / Otros" value={cirugia.retencionesOtros ? formatARS(parseArgMoney(cirugia.retencionesOtros)) : ''} />
         </div>
       </section>
@@ -189,7 +189,7 @@ function CirugiaModal({ cirugia, onClose, onCobrar, addToast }) {
 }
 
 function NuevaCirugiaModal({ onClose, onSaved, addToast }) {
-  const [form, setForm] = useState({ paciente: '', medico: '', fechaCx: '', mes: '', pedidoPresupuestado: '', obraSocial: '', consumo: '', valorImplantes: '', valorDescartables: '', valorLogistica: '', valorTotalCostos: '', montoPresupuesto: '', numeroFactura: '', montoFactura: '', fechaFactura: '', fechaCobroEsperada: '' });
+  const [form, setForm] = useState({ paciente: '', medico: '', fechaCx: '', mes: '', pedidoPresupuestado: '', obraSocial: '', consumo: '', valorImplantes: '', valorDescartables: '', valorLogistica: '', valorTotalCostos: '', montoPresupuesto: '', numeroFactura: '', montoFactura: '', fechaFactura: '', fechaCobro: '' });
   const [saving, setSaving] = useState(false);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -248,7 +248,7 @@ function NuevaCirugiaModal({ onClose, onSaved, addToast }) {
           <Field label="N° Factura" k="numeroFactura" />
           <Field label="Monto factura" k="montoFactura" />
           <Field label="Fecha factura" k="fechaFactura" placeholder="dd/mm/yyyy" />
-          <Field label="Fecha cobro esperada" k="fechaCobroEsperada" placeholder="dd/mm/yyyy" />
+          <Field label="Fecha cobro" k="fechaCobro" placeholder="dd/mm/yyyy" />
         </div>
         <div style={{ display: 'flex', gap: 10, paddingTop: 8, borderTop: '1px solid #E5E7EB' }}>
           <button

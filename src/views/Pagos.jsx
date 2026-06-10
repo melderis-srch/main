@@ -126,7 +126,7 @@ export default function Pagos({ data, loading, refetch, addToast }) {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
             <thead>
               <tr style={{ background: '#F9FAFB', borderBottom: '1px solid #E5E7EB' }}>
-                {['F. Emisión', 'Emisor', 'N° Factura', 'Categoría', 'Descripción', 'Monto', 'F. Pago', 'Estado', 'Forma Pago', 'Acción'].map(h => (
+                {['F. Emisión', 'Emisor', 'N° Factura', 'Categoría', 'Descripción', 'Monto', 'F. Pago', 'Estado', 'Forma Pago', 'Reclamos', 'Acción'].map(h => (
                   <th key={h} style={{ padding: '11px 14px', textAlign: 'left', fontWeight: 600, color: '#374151', fontSize: 12, whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
@@ -155,6 +155,7 @@ export default function Pagos({ data, loading, refetch, addToast }) {
                           }
                         </td>
                         <td style={{ padding: '10px 14px', color: '#6B7280' }}>{g.formaPago}</td>
+                        <td style={{ padding: '10px 14px', color: g.reclamos === 'pagado' ? '#059669' : '#6B7280', fontSize: 12 }}>{g.reclamos}</td>
                         <td style={{ padding: '10px 14px' }}>
                           {!g.pagado && (
                             <button
@@ -171,7 +172,7 @@ export default function Pagos({ data, loading, refetch, addToast }) {
                   })
               }
               {!loading && gastosPagos.length === 0 && (
-                <tr><td colSpan={10} style={{ padding: '40px', textAlign: 'center', color: '#9CA3AF' }}>Sin datos</td></tr>
+                <tr><td colSpan={11} style={{ padding: '40px', textAlign: 'center', color: '#9CA3AF' }}>Sin datos</td></tr>
               )}
             </tbody>
           </table>
