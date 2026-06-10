@@ -40,4 +40,9 @@ export const gasClient = {
 
   registrarCobro: (data) =>
     gasPost('registrarCobro', data),
+
+  updateCirugia: (rowIndex, fields) => gasPost('updateCirugia', { rowIndex, fields }),
+  updateCobro: (rowIndex, fields) => gasPost('updateCobro', { rowIndex, fields }),
+  updateGasto: (rowIndex, fields) => gasPost('updateGasto', { rowIndex, fields }),
+  registrarGasto: (data) => gasPost('registrarGasto', data),
 };

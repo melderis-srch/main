@@ -54,7 +54,7 @@ export default function SurcherieApp() {
   };
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#F7F8FA', fontFamily: "'DM Sans', sans-serif" }}>
+    <div style={{ display: 'flex', minHeight: '100vh', background: '#F8FAFC', fontFamily: "'Inter', sans-serif" }}>
       {!isMobile && <Sidebar active={page} onNavigate={setPage} />}
 
       <div style={{ flex: 1, marginLeft: isMobile ? 0 : 220, display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>

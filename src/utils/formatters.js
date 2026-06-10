@@ -72,6 +72,24 @@ export function daysDiff(from, to = new Date()) {
   return Math.floor((to - d) / (1000 * 60 * 60 * 24));
 }
 
+export function parseISOMonth(yyyymm) {
+  if (!yyyymm) return null;
+  const [y, m] = yyyymm.split('-');
+  return new Date(Number(y), Number(m) - 1, 1);
+}
+
+export function isEcheq(medioPago) {
+  if (!medioPago) return false;
+  const s = String(medioPago).toLowerCase();
+  return s.includes('echeq') || s.includes('cheque') || s.includes('cheq');
+}
+
+// Normaliza texto a Mayúscula inicial: "JUAN PEREZ" → "Juan Perez"
+export function toTitleCase(str) {
+  if (!str) return '';
+  return String(str).toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+}
+
 export const MONTHS_ES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'

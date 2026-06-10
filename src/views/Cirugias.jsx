@@ -5,8 +5,20 @@ import { Badge } from '../components/UI/Badge';
 import { Modal } from '../components/UI/Modal';
 import { ProgressBar } from '../components/UI/ProgressBar';
 import { SkeletonTable } from '../components/UI/Skeleton';
-import { parseArgMoney, formatARS, formatPct, formatDate, parseDate, MONTHS_ES } from '../utils/formatters';
+import { parseArgMoney, formatARS, formatPct, formatDate, parseDate, MONTHS_ES, toTitleCase } from '../utils/formatters';
 import { gasClient } from '../utils/gasClient';
+
+const EDIT_FIELDS = [
+  { k: 'medico', label: 'Médico' },
+  { k: 'obraSocial', label: 'Obra Social' },
+  { k: 'fechaCx', label: 'Fecha cirugía', placeholder: 'dd/mm/yyyy' },
+  { k: 'montoPresupuesto', label: 'Monto presupuesto' },
+  { k: 'numeroFactura', label: 'N° Factura' },
+  { k: 'montoFactura', label: 'Monto factura' },
+  { k: 'fechaFactura', label: 'Fecha factura', placeholder: 'dd/mm/yyyy' },
+  { k: 'fechaCobro', label: 'Fecha cobro', placeholder: 'dd/mm/yyyy' },
+  { k: 'retencionesOtros', label: 'Retenciones / Otros' },
+];
 
 function getBadgeType(c) {
   if (c.cobrado) return 'cobrado';
@@ -44,6 +56,8 @@ function CirugiaModal({ cirugia, onClose, onCobrar, addToast }) {
   const [showCobrarForm, setShowCobrarForm] = useState(false);
   const [fechaCobro, setFechaCobro] = useState(formatDate(new Date()));
   const [saving, setSaving] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [editForm, setEditForm] = useState(null);
 
   if (!cirugia) return null;
   const badgeType = getBadgeType(cirugia);
@@ -63,20 +77,71 @@ function CirugiaModal({ cirugia, onClose, onCobrar, addToast }) {
     }
   };
 
+  const startEdit = () => {
+    const f = {};
+    EDIT_FIELDS.forEach(({ k }) => { f[k] = cirugia[k] || ''; });
+    setEditForm(f);
+    setEditMode(true);
+  };
+
+  const handleSaveEdit = async () => {
+    setSaving(true);
+    try {
+      await gasClient.updateCirugia(cirugia.rowIndex, editForm);
+      addToast('Cirugía actualizada', 'success');
+      onCobrar();
+      onClose();
+    } catch (e) {
+      addToast('Error: ' + e.message, 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (editMode) {
+    return (
+      <Modal open onClose={onClose} width={620}
+        title={<span style={{ fontSize: 17, fontWeight: 700 }}>Editar — {toTitleCase(cirugia.paciente)}</span>}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            {EDIT_FIELDS.map(({ k, label, placeholder }) => (
+              <div key={k}>
+                <label style={{ fontSize: 12, color: '#6B7280', fontWeight: 500, display: 'block', marginBottom: 4 }}>{label}</label>
+                <input value={editForm[k] || ''} onChange={e => setEditForm(f => ({ ...f, [k]: e.target.value }))} placeholder={placeholder || ''}
+                  style={{ width: '100%', padding: '7px 10px', border: '1px solid #E5E7EB', borderRadius: 6, fontSize: 13, fontFamily: 'inherit', boxSizing: 'border-box' }} />
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 8, paddingTop: 8, borderTop: '1px solid #E5E7EB' }}>
+            <button onClick={handleSaveEdit} disabled={saving}
+              style={{ flex: 1, padding: '9px', background: '#E8622A', color: '#fff', border: 'none', borderRadius: 7, cursor: saving ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
+              {saving ? 'Guardando...' : 'Guardar cambios'}
+            </button>
+            <button onClick={() => setEditMode(false)} style={{ padding: '9px 18px', background: '#F9FAFB', color: '#374151', border: '1px solid #E5E7EB', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontFamily: 'inherit' }}>Volver</button>
+          </div>
+        </div>
+      </Modal>
+    );
+  }
+
   return (
     <Modal open onClose={onClose} width={700}
       title={
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ fontSize: 18, fontWeight: 700, color: '#111827' }}>{cirugia.paciente}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
+          <span style={{ fontSize: 18, fontWeight: 700, color: '#111827' }}>{toTitleCase(cirugia.paciente)}</span>
           <Badge type={badgeType}>{getBadgeLabel(cirugia)}</Badge>
+          <button onClick={startEdit}
+            style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px', background: 'none', border: '1px solid #E5E7EB', borderRadius: 6, cursor: 'pointer', color: '#6B7280', fontSize: 12, fontFamily: 'inherit' }}>
+            <Edit2 size={13} /> Editar
+          </button>
         </div>
       }
     >
       {/* Info chips */}
       <section style={{ marginBottom: 20 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
-          <InfoChip label="Médico" value={cirugia.medico} />
-          <InfoChip label="Obra Social" value={cirugia.obraSocial} />
+          <InfoChip label="Médico" value={toTitleCase(cirugia.medico)} />
+          <InfoChip label="Obra Social" value={toTitleCase(cirugia.obraSocial)} />
           <InfoChip label="Mes" value={cirugia.mes} />
           <InfoChip label="Fecha cirugía" value={cirugia.fechaCx} />
           <InfoChip label="Pedido / Presupuestado" value={cirugia.pedidoPresupuestado} />
@@ -358,10 +423,10 @@ export default function Cirugias({ data, loading, refetch, addToast }) {
                       onMouseEnter={e => e.currentTarget.style.background = '#F9FAFB'}
                       onMouseLeave={e => e.currentTarget.style.background = ''}
                     >
-                      <td style={{ padding: '11px 14px', fontWeight: 600, color: '#111827' }}>{c.paciente}</td>
+                      <td style={{ padding: '11px 14px', fontWeight: 600, color: '#111827' }}>{toTitleCase(c.paciente)}</td>
                       <td style={{ padding: '11px 14px', color: '#6B7280', whiteSpace: 'nowrap' }}>{c.fechaCx}</td>
-                      <td style={{ padding: '11px 14px', color: '#374151' }}>{c.medico}</td>
-                      <td style={{ padding: '11px 14px', color: '#374151' }}>{c.obraSocial}</td>
+                      <td style={{ padding: '11px 14px', color: '#374151' }}>{toTitleCase(c.medico)}</td>
+                      <td style={{ padding: '11px 14px', color: '#374151' }}>{toTitleCase(c.obraSocial)}</td>
                       <td style={{ padding: '11px 14px', color: '#6B7280', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.consumo}</td>
                       <td style={{ padding: '11px 14px', fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }}>{c.montoFactura ? formatARS(parseArgMoney(c.montoFactura)) : '—'}</td>
                       <td style={{ padding: '11px 14px', fontFamily: 'JetBrains Mono, monospace', fontSize: 13, color: '#6B7280' }}>{c.valorTotalCostos ? formatARS(parseArgMoney(c.valorTotalCostos)) : '—'}</td>

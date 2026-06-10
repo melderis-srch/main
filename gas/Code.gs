@@ -65,6 +65,10 @@ function doPost(e) {
     else if (action === 'updatePagado')    result = updatePagado(data.rowIndex);
     else if (action === 'addCirugia')      result = addCirugia(data);
     else if (action === 'registrarCobro')  result = registrarCobro(data);
+    else if (action === 'updateCirugia')   result = updateCirugia(data.rowIndex, data.fields);
+    else if (action === 'updateCobro')     result = updateCobro(data.rowIndex, data.fields);
+    else if (action === 'updateGasto')     result = updateGasto(data.rowIndex, data.fields);
+    else if (action === 'registrarGasto')  result = registrarGasto(data);
     else result = { error: 'Accion no reconocida: ' + action };
     return makeResponse({ success: true, data: result });
   } catch (err) {
@@ -362,6 +366,69 @@ function registrarCobro(data) {
     data.montoCobrado||'', data.medioPago||'', data.lugarPago||'',
     data.condicionPago||'', data.fechaCobroEsperada||'',
     data.fechaCobroReal||'', data.fechaCobroCheque||''
+  ]);
+  return { appended: true };
+}
+
+// ============================================================
+// WRITE — Edición de registros completos
+// ============================================================
+function updateCirugia(rowIndex, fields) {
+  var ss = SpreadsheetApp.openById(CIRUCIAS_SHEET_ID);
+  var sheet = findSheet(ss, 'Cirugías');
+  if (!sheet) throw new Error('Hoja Cirugías no encontrada');
+  var colMap = {
+    paciente:1, medico:2, fechaCx:3, mes:4, pedidoPresupuestado:5, obraSocial:6,
+    consumo:7, valorImplantes:8, valorDescartables:9, valorLogistica:10,
+    correccionGastos:11, valorTotalCostos:12, montoPresupuesto:13,
+    numeroFactura:14, montoFactura:15, fechaFactura:16,
+    fechaCobro:17, cobrado:18, retencionesOtros:19
+  };
+  for (var key in fields) {
+    if (colMap[key] !== undefined) sheet.getRange(rowIndex, colMap[key]).setValue(fields[key]);
+  }
+  return { updated: rowIndex };
+}
+
+function updateCobro(rowIndex, fields) {
+  var ss = SpreadsheetApp.openById(FINANCIERO_SHEET_ID);
+  var sheet = findSheet(ss, 'VENTASCOBROS');
+  if (!sheet) throw new Error('Hoja VENTASCOBROS no encontrada');
+  var colMap = {
+    paciente:1, obraSocial:2, nroFactura:3, montoFacturado:4, fechaFactura:5,
+    retGanancias:6, retIIBB:7, retSellados:8, montoCobrado:9, medioPago:10,
+    lugarPago:11, condicionPago:12, fechaCobroEsperada:13, fechaCobroReal:14, fechaCobroCheque:15
+  };
+  for (var key in fields) {
+    if (colMap[key] !== undefined) sheet.getRange(rowIndex, colMap[key]).setValue(fields[key]);
+  }
+  return { updated: rowIndex };
+}
+
+function updateGasto(rowIndex, fields) {
+  var ss = SpreadsheetApp.openById(FINANCIERO_SHEET_ID);
+  var sheet = findSheet(ss, 'GASTOSPAGOS');
+  if (!sheet) throw new Error('Hoja GASTOSPAGOS no encontrada');
+  var colMap = {
+    fechaEmision:1, nroFactura:2, monto:3, emisor:4, categoria:5,
+    descripcion:6, fechaPago:7, pagado:8, formaPago:9,
+    comprobanteEnviado:10, recibo:11, reclamos:12
+  };
+  for (var key in fields) {
+    if (colMap[key] !== undefined) sheet.getRange(rowIndex, colMap[key]).setValue(fields[key]);
+  }
+  return { updated: rowIndex };
+}
+
+function registrarGasto(data) {
+  var ss = SpreadsheetApp.openById(FINANCIERO_SHEET_ID);
+  var sheet = findSheet(ss, 'GASTOSPAGOS');
+  if (!sheet) throw new Error('Hoja GASTOSPAGOS no encontrada');
+  sheet.appendRow([
+    data.fechaEmision||'', data.nroFactura||'', data.monto||'',
+    data.emisor||'', data.categoria||'', data.descripcion||'',
+    data.fechaPago||'', false, data.formaPago||'',
+    data.comprobanteEnviado||'', data.recibo||'', data.reclamos||''
   ]);
   return { appended: true };
 }

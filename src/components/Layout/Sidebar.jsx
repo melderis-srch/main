@@ -14,7 +14,7 @@ export function Sidebar({ active, onNavigate }) {
   return (
     <nav style={{
       width: 220, minHeight: '100vh',
-      background: '#2B4C8C',
+      background: '#0F172A',
       display: 'flex', flexDirection: 'column',
       position: 'fixed', left: 0, top: 0, bottom: 0,
       zIndex: 100
@@ -45,8 +45,8 @@ export function Sidebar({ active, onNavigate }) {
                 width: '100%', display: 'flex', alignItems: 'center', gap: 10,
                 padding: '10px 12px', marginBottom: 2,
                 borderRadius: 8, border: 'none', cursor: 'pointer',
-                background: isActive ? '#E8622A' : 'transparent',
-                color: isActive ? '#fff' : 'rgba(255,255,255,0.7)',
+                background: isActive ? 'rgba(232,98,42,0.1)' : 'transparent',
+                color: isActive ? '#E8622A' : 'rgba(255,255,255,0.55)',
                 fontFamily: 'inherit', fontSize: 14, fontWeight: isActive ? 600 : 400,
                 textAlign: 'left', transition: 'all 0.15s'
               }}
@@ -86,7 +86,7 @@ export function BottomNav({ active, onNavigate }) {
   return (
     <nav style={{
       position: 'fixed', bottom: 0, left: 0, right: 0,
-      background: '#2B4C8C',
+      background: '#0F172A',
       display: 'flex', zIndex: 100,
       borderTop: '1px solid rgba(255,255,255,0.1)'
     }}>
