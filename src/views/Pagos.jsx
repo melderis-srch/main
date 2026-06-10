@@ -151,10 +151,14 @@ export default function Pagos({ data, loading, refetch, addToast }) {
         ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 20 }}>{Array(4).fill(0).map((_, i) => <SkeletonKPI key={i} />)}</div>
         : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 20 }}>
-            <KPICard label="Total gastos" value={formatARS(kpis.total)} icon={Receipt} color="#6B7280" />
-            <KPICard label="Pagado" value={formatARS(kpis.pagado)} icon={CreditCard} color="#059669" />
-            <KPICard label="Proyectado (echeq)" value={formatARS(kpis.proyectado)} icon={CalendarClock} color="#1D4ED8" />
-            <KPICard label="Pendiente de pago" value={formatARS(kpis.pendiente)} icon={AlertCircle} color="#D97706" />
+            <KPICard label="Total gastos" value={formatARS(kpis.total)} icon={Receipt} color="#6B7280"
+              hint="Suma de todas las facturas de gastos del período, pagadas o no." />
+            <KPICard label="Pagado" value={formatARS(kpis.pagado)} icon={CreditCard} color="#059669"
+              hint="Gastos ya cancelados (marcados como pagados o con echeq saldado/debitado)." />
+            <KPICard label="Proyectado (echeq)" value={formatARS(kpis.proyectado)} icon={CalendarClock} color="#1D4ED8"
+              hint="Echeq emitido con fecha de débito futura, todavía no saldado. Saldrá de la cuenta ese día." />
+            <KPICard label="Pendiente de pago" value={formatARS(kpis.pendiente)} icon={AlertCircle} color="#D97706"
+              hint="Gastos sin pagar y sin echeq programado. Falta definir el pago." />
           </div>
         )
       }

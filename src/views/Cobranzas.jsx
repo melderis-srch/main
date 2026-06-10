@@ -145,10 +145,14 @@ export default function Cobranzas({ data, loading, refetch, addToast }) {
         ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 20 }}>{Array(4).fill(0).map((_, i) => <SkeletonKPI key={i} />)}</div>
         : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 20 }}>
-            <KPICard label="Facturado" value={formatARS(kpis.facturado)} icon={TrendingUp} color="#6B7280" />
-            <KPICard label="Ingresado" value={formatARS(kpis.ingresado)} icon={TrendingUp} color="#059669" />
-            <KPICard label="Proyectado (echeq)" value={formatARS(kpis.proyectado)} icon={CalendarClock} color="#1D4ED8" />
-            <KPICard label="Pendiente" value={formatARS(kpis.pendiente)} icon={Clock} color="#DC2626" />
+            <KPICard label="Facturado" value={formatARS(kpis.facturado)} icon={TrendingUp} color="#6B7280"
+              hint="Total emitido en facturas del período. Lo que se debería cobrar." />
+            <KPICard label="Ingresado" value={formatARS(kpis.ingresado)} icon={TrendingUp} color="#059669"
+              hint="Dinero efectivamente recibido (con Fecha de cobro REAL cargada)." />
+            <KPICard label="Proyectado (echeq)" value={formatARS(kpis.proyectado)} icon={CalendarClock} color="#1D4ED8"
+              hint="Cheques/echeq sin acreditar todavía, netos de retenciones. Se cobran en la fecha de acreditación." />
+            <KPICard label="Pendiente" value={formatARS(kpis.pendiente)} icon={Clock} color="#DC2626"
+              hint="Facturado sin cobro real ni cheque en circulación. Aún no entró nada." />
           </div>
         )
       }

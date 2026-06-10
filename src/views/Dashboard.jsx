@@ -7,7 +7,7 @@ import {
 import { KPICard } from '../components/UI/KPICard';
 import { SkeletonKPI, Skeleton } from '../components/UI/Skeleton';
 import { parseArgMoney, formatARS, parseDate, daysDiff, toTitleCase } from '../utils/formatters';
-import { DollarSign, TrendingUp, Clock, AlertCircle, Receipt, CreditCard, CalendarClock } from 'lucide-react';
+import { DollarSign, TrendingUp, Clock, AlertCircle, Receipt, CreditCard, CalendarClock, ArrowRight } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -65,7 +65,8 @@ export default function Dashboard({ data, loading }) {
       return s + parseArgMoney(v.montoFacturado) - retes;
     }, 0);
     const pendiente = rows.filter(v => !v.fechaCobroReal && !v.fechaCobroCheque).reduce((s, v) => s + parseArgMoney(v.montoFacturado), 0);
-    return { facturado, ingresado, proyectado, pendiente };
+    const porIngresar = facturado - ingresado;
+    return { facturado, ingresado, proyectado, pendiente, porIngresar };
   }, [ventasCobros, selectedMonth]);
 
   const gastos = useMemo(() => {
@@ -132,20 +133,48 @@ export default function Dashboard({ data, loading }) {
       <div>
         <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 600, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Cobros</p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
-          <KPICard label="Facturado" value={formatARS(cobros.facturado)} icon={DollarSign} color="#6B7280" />
-          <KPICard label="Ingresado" value={formatARS(cobros.ingresado)} icon={TrendingUp} color="#059669" />
-          <KPICard label="Proyectado (echeq)" value={formatARS(cobros.proyectado)} icon={CalendarClock} color="#1D4ED8" />
-          <KPICard label="Pendiente s/ cobrar" value={formatARS(cobros.pendiente)} icon={Clock} color="#DC2626" />
+          <KPICard label="Facturado" value={formatARS(cobros.facturado)} icon={DollarSign} color="#6B7280"
+            hint="Total emitido en facturas. Es lo que se debería cobrar, sin importar si ya ingresó o no." />
+          <KPICard label="Ingresado" value={formatARS(cobros.ingresado)} icon={TrendingUp} color="#059669"
+            hint="Dinero efectivamente recibido (con Fecha de cobro REAL cargada). Es la plata que ya entró." />
+          <KPICard label="Proyectado (echeq)" value={formatARS(cobros.proyectado)} icon={CalendarClock} color="#1D4ED8"
+            hint="Cheques/echeq aún no acreditados, netos de retenciones. Se debitan en la fecha de acreditación; todavía no ingresaron." />
+          <KPICard label="Pendiente s/ cobrar" value={formatARS(cobros.pendiente)} icon={Clock} color="#DC2626"
+            hint="Facturado sin fecha de cobro real ni cheque en circulación. Aún no se cobró ni hay valor depositado." />
         </div>
       </div>
+
+      <Card style={{ padding: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'stretch', padding: '16px 22px' }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 11, color: '#6B7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Facturado</span>
+            <span style={{ fontSize: 22, fontWeight: 700, color: '#111827', fontFamily: 'JetBrains Mono, monospace' }}>{formatARS(cobros.facturado)}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', color: '#D1D5DB', padding: '0 18px' }}><ArrowRight size={20} /></div>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 11, color: '#6B7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ingresado (real)</span>
+            <span style={{ fontSize: 22, fontWeight: 700, color: '#059669', fontFamily: 'JetBrains Mono, monospace' }}>{formatARS(cobros.ingresado)}</span>
+          </div>
+          <div style={{ width: 1, background: '#E5E7EB', margin: '0 18px' }} />
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 11, color: '#6B7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Diferencia (por ingresar)</span>
+            <span style={{ fontSize: 22, fontWeight: 700, color: cobros.porIngresar > 0 ? '#DC2626' : '#059669', fontFamily: 'JetBrains Mono, monospace' }}>{formatARS(cobros.porIngresar)}</span>
+            <span style={{ fontSize: 11, color: '#9CA3AF' }}>{cobros.facturado > 0 ? `${Math.round((cobros.ingresado / cobros.facturado) * 100)}% cobrado` : '—'}</span>
+          </div>
+        </div>
+      </Card>
 
       <div>
         <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 600, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Gastos</p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
-          <KPICard label="Total gastos" value={formatARS(gastos.total)} icon={Receipt} color="#6B7280" />
-          <KPICard label="Pagado" value={formatARS(gastos.pagado)} icon={CreditCard} color="#059669" />
-          <KPICard label="Proyectado (echeq)" value={formatARS(gastos.proyectado)} icon={CalendarClock} color="#1D4ED8" />
-          <KPICard label="Pendiente de pago" value={formatARS(gastos.pendiente)} icon={AlertCircle} color="#D97706" />
+          <KPICard label="Total gastos" value={formatARS(gastos.total)} icon={Receipt} color="#6B7280"
+            hint="Suma de todas las facturas de gastos del período, estén pagadas o no." />
+          <KPICard label="Pagado" value={formatARS(gastos.pagado)} icon={CreditCard} color="#059669"
+            hint="Gastos ya cancelados (marcados como pagados o con el echeq saldado/debitado)." />
+          <KPICard label="Proyectado (echeq)" value={formatARS(gastos.proyectado)} icon={CalendarClock} color="#1D4ED8"
+            hint="Pagos con echeq emitido y fecha de débito futura, todavía no saldado. Va a salir de la cuenta en esa fecha." />
+          <KPICard label="Pendiente de pago" value={formatARS(gastos.pendiente)} icon={AlertCircle} color="#D97706"
+            hint="Gastos sin pagar y sin echeq programado. Falta definir el pago." />
         </div>
       </div>
 
