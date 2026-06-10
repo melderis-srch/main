@@ -62,14 +62,14 @@ export default function Consolidado({ data, loading }) {
               <tr key={i} style={{ borderBottom: '1px solid #F3F4F6' }}>
                 <td style={{ padding: '10px 14px', fontWeight: 600, color: '#111827', whiteSpace: 'nowrap' }}>{c.mes}</td>
                 <td style={{ padding: '10px 14px', textAlign: 'right', color: '#374151' }}>{c.cantidadCirugias || '—'}</td>
-                <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#6B7280' }}>{c.factMesCxCorriente ? formatARS(parseArgMoney(c.factMesCxCorriente)) : '—'}</td>
-                <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#6B7280' }}>{c.factMesCxAnterior ? formatARS(parseArgMoney(c.factMesCxAnterior)) : '—'}</td>
-                <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'DM Mono, monospace', fontSize: 13, fontWeight: 600 }}>{formatARS(parseArgMoney(c.montoFacturadoTotal))}</td>
-                <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#6B7280' }}>{formatARS(parseArgMoney(c.costosCirugias))}</td>
-                <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#059669' }}>{formatARS(parseArgMoney(c.montoRecolectado))}</td>
-                <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#6B7280' }}>{formatARS(parseArgMoney(c.gastosProveedores))}</td>
-                <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#6B7280' }}>{formatARS(parseArgMoney(c.otrosGastos))}</td>
-                <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'DM Mono, monospace', fontSize: 13 }}>{formatARS(parseArgMoney(c.totalGastos))}</td>
+                <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'JetBrains Mono, monospace', fontSize: 13, color: '#6B7280' }}>{c.factMesCxCorriente ? formatARS(parseArgMoney(c.factMesCxCorriente)) : '—'}</td>
+                <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'JetBrains Mono, monospace', fontSize: 13, color: '#6B7280' }}>{c.factMesCxAnterior ? formatARS(parseArgMoney(c.factMesCxAnterior)) : '—'}</td>
+                <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'JetBrains Mono, monospace', fontSize: 13, fontWeight: 600 }}>{formatARS(parseArgMoney(c.montoFacturadoTotal))}</td>
+                <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'JetBrains Mono, monospace', fontSize: 13, color: '#6B7280' }}>{formatARS(parseArgMoney(c.costosCirugias))}</td>
+                <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'JetBrains Mono, monospace', fontSize: 13, color: '#059669' }}>{formatARS(parseArgMoney(c.montoRecolectado))}</td>
+                <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'JetBrains Mono, monospace', fontSize: 13, color: '#6B7280' }}>{formatARS(parseArgMoney(c.gastosProveedores))}</td>
+                <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'JetBrains Mono, monospace', fontSize: 13, color: '#6B7280' }}>{formatARS(parseArgMoney(c.otrosGastos))}</td>
+                <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }}>{formatARS(parseArgMoney(c.totalGastos))}</td>
                 <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 600, color: pctColor(c.pctRecoleccion) }}>{pct(c.pctRecoleccion)}</td>
                 <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 600, color: pctColor(c.pctRentabilidad) }}>{pct(c.pctRentabilidad)}</td>
               </tr>
@@ -85,12 +85,12 @@ export default function Consolidado({ data, loading }) {
                 <td style={{ padding: '11px 14px', textAlign: 'right' }}>{totals.cantidadCirugias}</td>
                 <td style={{ padding: '11px 14px', textAlign: 'right' }}>—</td>
                 <td style={{ padding: '11px 14px', textAlign: 'right' }}>—</td>
-                <td style={{ padding: '11px 14px', textAlign: 'right', fontFamily: 'DM Mono, monospace', fontSize: 13 }}>{formatARS(totals.montoFacturadoTotal)}</td>
-                <td style={{ padding: '11px 14px', textAlign: 'right', fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#6B7280' }}>{formatARS(totals.costosCirugias)}</td>
-                <td style={{ padding: '11px 14px', textAlign: 'right', fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#059669' }}>{formatARS(totals.montoRecolectado)}</td>
-                <td style={{ padding: '11px 14px', textAlign: 'right', fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#6B7280' }}>{formatARS(totals.gastosProveedores)}</td>
-                <td style={{ padding: '11px 14px', textAlign: 'right', fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#6B7280' }}>{formatARS(totals.otrosGastos)}</td>
-                <td style={{ padding: '11px 14px', textAlign: 'right', fontFamily: 'DM Mono, monospace', fontSize: 13 }}>{formatARS(totals.totalGastos)}</td>
+                <td style={{ padding: '11px 14px', textAlign: 'right', fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }}>{formatARS(totals.montoFacturadoTotal)}</td>
+                <td style={{ padding: '11px 14px', textAlign: 'right', fontFamily: 'JetBrains Mono, monospace', fontSize: 13, color: '#6B7280' }}>{formatARS(totals.costosCirugias)}</td>
+                <td style={{ padding: '11px 14px', textAlign: 'right', fontFamily: 'JetBrains Mono, monospace', fontSize: 13, color: '#059669' }}>{formatARS(totals.montoRecolectado)}</td>
+                <td style={{ padding: '11px 14px', textAlign: 'right', fontFamily: 'JetBrains Mono, monospace', fontSize: 13, color: '#6B7280' }}>{formatARS(totals.gastosProveedores)}</td>
+                <td style={{ padding: '11px 14px', textAlign: 'right', fontFamily: 'JetBrains Mono, monospace', fontSize: 13, color: '#6B7280' }}>{formatARS(totals.otrosGastos)}</td>
+                <td style={{ padding: '11px 14px', textAlign: 'right', fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }}>{formatARS(totals.totalGastos)}</td>
                 <td style={{ padding: '11px 14px', textAlign: 'right' }}>—</td>
                 <td style={{ padding: '11px 14px', textAlign: 'right' }}>—</td>
               </tr>

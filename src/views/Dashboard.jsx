@@ -14,8 +14,6 @@ const ORANGE = '#E8622A';
 const BLUE = '#2B4C8C';
 const PIE_COLORS = ['#E8622A', '#2B4C8C', '#F59E0B', '#10B981', '#8B5CF6', '#EF4444', '#06B6D4', '#84CC16'];
 
-const MONTHS_ORDER = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-
 function SectionTitle({ children }) {
   return (
     <h3 style={{ margin: '0 0 14px', fontSize: 15, fontWeight: 700, color: '#111827' }}>{children}</h3>
@@ -163,7 +161,7 @@ export default function Dashboard({ data, loading }) {
         <Card style={{ padding: 0 }}>
           <div style={{ padding: '16px 20px', borderBottom: '1px solid #E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <SectionTitle>Cobros pendientes por obra social</SectionTitle>
-            <span style={{ fontSize: 13, color: '#6B7280', background: '#F3F4F6', padding: '3px 10px', borderRadius: 12, fontFamily: 'DM Mono, monospace' }}>
+            <span style={{ fontSize: 13, color: '#6B7280', background: '#F3F4F6', padding: '3px 10px', borderRadius: 12, fontFamily: 'JetBrains Mono, monospace' }}>
               {formatARS(deudaOS.reduce((s, o) => s + o.monto, 0))}
             </span>
           </div>
@@ -183,7 +181,7 @@ export default function Dashboard({ data, loading }) {
                   <tr key={i} style={{ borderBottom: '1px solid #F3F4F6' }}>
                     <td style={{ padding: '9px 16px', fontWeight: 500 }}>{os.name}</td>
                     <td style={{ padding: '9px 16px', textAlign: 'right', color: '#6B7280' }}>{os.facturas}</td>
-                    <td style={{ padding: '9px 16px', textAlign: 'right', fontFamily: 'DM Mono, monospace', fontSize: 13, fontWeight: 600, color: '#DC2626' }}>{formatARS(os.monto)}</td>
+                    <td style={{ padding: '9px 16px', textAlign: 'right', fontFamily: 'JetBrains Mono, monospace', fontSize: 13, fontWeight: 600, color: '#DC2626' }}>{formatARS(os.monto)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -195,7 +193,7 @@ export default function Dashboard({ data, loading }) {
         <Card style={{ padding: 0 }}>
           <div style={{ padding: '16px 20px', borderBottom: '1px solid #E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <SectionTitle>Deuda a proveedores</SectionTitle>
-            <span style={{ fontSize: 13, color: '#6B7280', background: '#F3F4F6', padding: '3px 10px', borderRadius: 12, fontFamily: 'DM Mono, monospace' }}>
+            <span style={{ fontSize: 13, color: '#6B7280', background: '#F3F4F6', padding: '3px 10px', borderRadius: 12, fontFamily: 'JetBrains Mono, monospace' }}>
               {formatARS(deudaProveedores.reduce((s, p) => s + p.monto, 0))}
             </span>
           </div>
@@ -217,7 +215,7 @@ export default function Dashboard({ data, loading }) {
                     <td style={{ padding: '9px 16px', textAlign: 'right', color: p.vencidas > 0 ? '#DC2626' : '#6B7280', fontSize: 12 }}>
                       {p.vencidas > 0 ? `${p.vencidas} venc.` : '—'}
                     </td>
-                    <td style={{ padding: '9px 16px', textAlign: 'right', fontFamily: 'DM Mono, monospace', fontSize: 13, fontWeight: 600, color: '#D97706' }}>{formatARS(p.monto)}</td>
+                    <td style={{ padding: '9px 16px', textAlign: 'right', fontFamily: 'JetBrains Mono, monospace', fontSize: 13, fontWeight: 600, color: '#D97706' }}>{formatARS(p.monto)}</td>
                   </tr>
                 ))}
               </tbody>

@@ -141,10 +141,10 @@ export default function Pagos({ data, loading, refetch, addToast }) {
                       <tr key={i} style={{ borderBottom: '1px solid #F3F4F6', background: vencida ? '#FFF5F5' : '#fff' }}>
                         <td style={{ padding: '10px 14px', color: '#6B7280', whiteSpace: 'nowrap' }}>{g.fechaEmision}</td>
                         <td style={{ padding: '10px 14px', fontWeight: 600 }}>{g.emisor}</td>
-                        <td style={{ padding: '10px 14px', fontFamily: 'DM Mono, monospace', fontSize: 13 }}>{g.nroFactura}</td>
+                        <td style={{ padding: '10px 14px', fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }}>{g.nroFactura}</td>
                         <td style={{ padding: '10px 14px', color: '#6B7280' }}>{g.categoria}</td>
                         <td style={{ padding: '10px 14px', color: '#374151', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.descripcion}</td>
-                        <td style={{ padding: '10px 14px', fontFamily: 'DM Mono, monospace', fontSize: 13, fontWeight: 600 }}>{formatARS(parseArgMoney(g.monto))}</td>
+                        <td style={{ padding: '10px 14px', fontFamily: 'JetBrains Mono, monospace', fontSize: 13, fontWeight: 600 }}>{formatARS(parseArgMoney(g.monto))}</td>
                         <td style={{ padding: '10px 14px', color: '#6B7280', whiteSpace: 'nowrap' }}>{g.fechaPago}</td>
                         <td style={{ padding: '10px 14px' }}>
                           {g.pagado

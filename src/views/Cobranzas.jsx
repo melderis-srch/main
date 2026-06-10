@@ -151,15 +151,15 @@ export default function Cobranzas({ data, loading, refetch, addToast }) {
                       <tr key={i} style={{ borderBottom: '1px solid #F3F4F6', background: getRowBg(estado) }}>
                         <td style={{ padding: '10px 14px', fontWeight: 600 }}>{v.paciente}</td>
                         <td style={{ padding: '10px 14px', color: '#374151' }}>{v.obraSocial}</td>
-                        <td style={{ padding: '10px 14px', fontFamily: 'DM Mono, monospace', fontSize: 13 }}>{v.nroFactura}</td>
-                        <td style={{ padding: '10px 14px', fontFamily: 'DM Mono, monospace', fontSize: 13 }}>{formatARS(parseArgMoney(v.montoFacturado))}</td>
-                        <td style={{ padding: '10px 14px', fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#6B7280' }}>{retes ? formatARS(retes) : '—'}</td>
-                        <td style={{ padding: '10px 14px', fontFamily: 'DM Mono, monospace', fontSize: 13 }}>{formatARS(neto)}</td>
+                        <td style={{ padding: '10px 14px', fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }}>{v.nroFactura}</td>
+                        <td style={{ padding: '10px 14px', fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }}>{formatARS(parseArgMoney(v.montoFacturado))}</td>
+                        <td style={{ padding: '10px 14px', fontFamily: 'JetBrains Mono, monospace', fontSize: 13, color: '#6B7280' }}>{retes ? formatARS(retes) : '—'}</td>
+                        <td style={{ padding: '10px 14px', fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }}>{formatARS(neto)}</td>
                         <td style={{ padding: '10px 14px', color: '#6B7280' }}>{v.medioPago}</td>
                         <td style={{ padding: '10px 14px', color: '#6B7280', whiteSpace: 'nowrap' }}>{v.fechaCobroEsperada}</td>
                         <td style={{ padding: '10px 14px', color: '#059669', whiteSpace: 'nowrap' }}>{v.fechaCobroReal}</td>
                         <td style={{ padding: '10px 14px', color: '#6B7280', whiteSpace: 'nowrap' }}>{v.fechaCobroCheque}</td>
-                        <td style={{ padding: '10px 14px', fontFamily: 'DM Mono, monospace', fontSize: 13, color: mora > 0 ? '#DC2626' : '#6B7280' }}>
+                        <td style={{ padding: '10px 14px', fontFamily: 'JetBrains Mono, monospace', fontSize: 13, color: mora > 0 ? '#DC2626' : '#6B7280' }}>
                           {mora !== null ? (mora > 0 ? `+${mora}d` : mora < 0 ? `${mora}d` : 'Hoy') : '—'}
                         </td>
                         <td style={{ padding: '10px 14px' }}>

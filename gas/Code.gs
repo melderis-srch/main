@@ -22,7 +22,8 @@ function findSheet(ss, name) {
     return s.toLowerCase()
       .replace(/[áàâä]/g,'a').replace(/[éèêë]/g,'e')
       .replace(/[íìîï]/g,'i').replace(/[óòôö]/g,'o')
-      .replace(/[úùûü]/g,'u').replace(/\s+/g,'');
+      .replace(/[úùûü]/g,'u')
+      .replace(/[^a-z0-9]/g,''); // quita espacios, barras, guiones, etc.
   }
   var target = normalize(name);
   var sheets = ss.getSheets();
