@@ -7,7 +7,7 @@ import { KPICard } from '../components/UI/KPICard';
 import { SkeletonTable, SkeletonKPI } from '../components/UI/Skeleton';
 import { parseArgMoney, formatARS, parseDate, daysDiff, toTitleCase } from '../utils/formatters';
 import { gasClient } from '../utils/gasClient';
-import { TrendingUp, Clock, CalendarClock } from 'lucide-react';
+import { TrendingUp, Clock, CalendarClock, ArrowDownUp } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -116,7 +116,8 @@ export default function Cobranzas({ data, loading, refetch, addToast }) {
       return s + parseArgMoney(v.montoFacturado) - retes;
     }, 0);
     const pendiente = filtered.filter(v => !v.fechaCobroReal && !v.fechaCobroCheque).reduce((s, v) => s + parseArgMoney(v.montoFacturado), 0);
-    return { facturado, ingresado, proyectado, pendiente };
+    const porIngresar = facturado - ingresado;
+    return { facturado, ingresado, proyectado, pendiente, porIngresar };
   }, [filtered]);
 
   const handleEdit = async (form) => {
@@ -151,6 +152,26 @@ export default function Cobranzas({ data, loading, refetch, addToast }) {
           </div>
         )
       }
+
+      {!loading && (
+        <div style={{ display: 'flex', alignItems: 'stretch', gap: 0, background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: '16px 22px', marginBottom: 20 }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 11, color: '#6B7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Facturado</span>
+            <span style={{ fontSize: 22, fontWeight: 700, color: '#111827', fontFamily: 'JetBrains Mono, monospace' }}>{formatARS(kpis.facturado)}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', color: '#D1D5DB', padding: '0 18px' }}><ArrowDownUp size={20} /></div>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 11, color: '#6B7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ingresado (real)</span>
+            <span style={{ fontSize: 22, fontWeight: 700, color: '#059669', fontFamily: 'JetBrains Mono, monospace' }}>{formatARS(kpis.ingresado)}</span>
+          </div>
+          <div style={{ width: 1, background: '#E5E7EB', margin: '0 18px' }} />
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 11, color: '#6B7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Diferencia (por ingresar)</span>
+            <span style={{ fontSize: 22, fontWeight: 700, color: kpis.porIngresar > 0 ? '#DC2626' : '#059669', fontFamily: 'JetBrains Mono, monospace' }}>{formatARS(kpis.porIngresar)}</span>
+            <span style={{ fontSize: 11, color: '#9CA3AF' }}>{kpis.facturado > 0 ? `${Math.round((kpis.ingresado / kpis.facturado) * 100)}% cobrado` : '—'}</span>
+          </div>
+        </div>
+      )}
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

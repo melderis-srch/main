@@ -5,15 +5,15 @@ import { Badge } from '../components/UI/Badge';
 import { Modal } from '../components/UI/Modal';
 import { KPICard } from '../components/UI/KPICard';
 import { SkeletonTable, SkeletonKPI } from '../components/UI/Skeleton';
-import { parseArgMoney, formatARS, parseDate, formatDate, daysDiff, isEcheq, toTitleCase } from '../utils/formatters';
+import { parseArgMoney, formatARS, parseDate, formatDate, daysDiff, toTitleCase } from '../utils/formatters';
 import { gasClient } from '../utils/gasClient';
 import { Receipt, CreditCard, AlertCircle, CalendarClock } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 function getEstadoGasto(g) {
-  if (g.pagado) return 'pagado';
-  if (isEcheq(g.formaPago) && g.fechaPago) return 'proyectado';
+  if (g.pagado || g.saldado) return 'pagado';
+  if (g.fechaPagoEcheq) return 'proyectado';
   if (daysDiff(parseDate(g.fechaEmision)) > 30) return 'vencido';
   return 'pendiente';
 }
@@ -32,7 +32,8 @@ const FIELDS_GASTO = [
   { k: 'monto', label: 'Monto' },
   { k: 'categoria', label: 'Categoría' },
   { k: 'formaPago', label: 'Forma de Pago' },
-  { k: 'fechaPago', label: 'F. Pago / Débito Echeq', placeholder: 'dd/mm/yyyy' },
+  { k: 'fechaPago', label: 'F. Pago', placeholder: 'dd/mm/yyyy' },
+  { k: 'fechaPagoEcheq', label: 'F. Débito Echeq', placeholder: 'dd/mm/yyyy' },
   { k: 'comprobanteEnviado', label: 'Comprobante Enviado' },
   { k: 'recibo', label: 'Recibo' },
 ];
@@ -70,11 +71,16 @@ function GastoForm({ initial, title, saveLabel, onSubmit, onClose, showPagado })
             style={{ width: '100%', padding: '7px 10px', border: '1px solid #E5E7EB', borderRadius: 6, fontSize: 13, fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }} />
         </div>
         {showPagado && (
-          <div style={{ padding: '8px 0', borderTop: '1px solid #F3F4F6' }}>
+          <div style={{ padding: '8px 0', borderTop: '1px solid #F3F4F6', display: 'flex', gap: 24 }}>
             <label style={{ fontSize: 13, color: '#374151', fontWeight: 500 }}>
               <input type="checkbox" checked={!!form.pagado} onChange={e => set('pagado', e.target.checked)}
                 style={{ marginRight: 6, width: 14, height: 14, cursor: 'pointer' }} />
               Marcar como pagado
+            </label>
+            <label style={{ fontSize: 13, color: '#374151', fontWeight: 500 }}>
+              <input type="checkbox" checked={!!form.saldado} onChange={e => set('saldado', e.target.checked)}
+                style={{ marginRight: 6, width: 14, height: 14, cursor: 'pointer' }} />
+              Echeq saldado / debitado
             </label>
           </div>
         )}
@@ -113,8 +119,8 @@ export default function Pagos({ data, loading, refetch, addToast }) {
   const kpis = useMemo(() => {
     const total = filtered.reduce((s, g) => s + parseArgMoney(g.monto), 0);
     const pagado = filtered.filter(g => g.pagado).reduce((s, g) => s + parseArgMoney(g.monto), 0);
-    const proyectado = filtered.filter(g => !g.pagado && isEcheq(g.formaPago) && g.fechaPago).reduce((s, g) => s + parseArgMoney(g.monto), 0);
-    const pendiente = filtered.filter(g => !g.pagado && !(isEcheq(g.formaPago) && g.fechaPago)).reduce((s, g) => s + parseArgMoney(g.monto), 0);
+    const proyectado = filtered.filter(g => !g.pagado && !g.saldado && g.fechaPagoEcheq).reduce((s, g) => s + parseArgMoney(g.monto), 0);
+    const pendiente = filtered.filter(g => !g.pagado && !g.saldado && !g.fechaPagoEcheq).reduce((s, g) => s + parseArgMoney(g.monto), 0);
     return { total, pagado, proyectado, pendiente };
   }, [filtered]);
 
@@ -137,7 +143,7 @@ export default function Pagos({ data, loading, refetch, addToast }) {
     } catch (e) { addToast('Error: ' + e.message, 'error'); }
   };
 
-  const HEADERS = ['F. Emisión', 'N° Factura', 'Proveedor', 'Categoría', 'Descripción', 'Monto', 'Forma Pago', 'F. Pago / Echeq', 'Compr.', 'Recibo', 'Notas', 'Estado', ''];
+  const HEADERS = ['F. Emisión', 'N° Factura', 'Proveedor', 'Categoría', 'Descripción', 'Monto', 'Forma Pago', 'F. Pago', 'F. Débito Echeq', 'Compr.', 'Recibo', 'Notas', 'Estado', ''];
 
   return (
     <div>
@@ -192,7 +198,10 @@ export default function Pagos({ data, loading, refetch, addToast }) {
                         <td style={{ padding: '9px 12px', color: '#374151', maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={g.descripcion}>{toTitleCase(g.descripcion)}</td>
                         <td style={{ padding: '9px 12px', fontFamily: 'JetBrains Mono, monospace', fontSize: 12, fontWeight: 600 }}>{formatARS(parseArgMoney(g.monto))}</td>
                         <td style={{ padding: '9px 12px', color: '#6B7280' }}>{toTitleCase(g.formaPago)}</td>
-                        <td style={{ padding: '9px 12px', color: estado === 'proyectado' ? '#1D4ED8' : '#9CA3AF', fontSize: 12, whiteSpace: 'nowrap' }}>{g.fechaPago || '—'}</td>
+                        <td style={{ padding: '9px 12px', color: '#9CA3AF', fontSize: 12, whiteSpace: 'nowrap' }}>{g.fechaPago || '—'}</td>
+                        <td style={{ padding: '9px 12px', fontSize: 12, whiteSpace: 'nowrap', fontWeight: g.fechaPagoEcheq ? 600 : 400, color: g.fechaPagoEcheq ? (g.saldado ? '#059669' : '#1D4ED8') : '#9CA3AF' }}>
+                          {g.fechaPagoEcheq ? (g.saldado ? `✓ ${g.fechaPagoEcheq}` : g.fechaPagoEcheq) : '—'}
+                        </td>
                         <td style={{ padding: '9px 12px', color: '#9CA3AF', fontSize: 12 }}>{g.comprobanteEnviado || '—'}</td>
                         <td style={{ padding: '9px 12px', color: '#9CA3AF', fontSize: 12 }}>{g.recibo || '—'}</td>
                         <td style={{ padding: '9px 12px', color: '#9CA3AF', fontSize: 12, maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={g.reclamos}>{g.reclamos || '—'}</td>
@@ -222,7 +231,7 @@ export default function Pagos({ data, loading, refetch, addToast }) {
 
       {showModal && (
         <GastoForm
-          initial={{ fechaEmision: formatDate(new Date()), nroFactura: '', monto: '', emisor: '', categoria: '', descripcion: '', fechaPago: '', formaPago: '', comprobanteEnviado: '', recibo: '', reclamos: '' }}
+          initial={{ fechaEmision: formatDate(new Date()), nroFactura: '', monto: '', emisor: '', categoria: '', descripcion: '', fechaPago: '', fechaPagoEcheq: '', formaPago: '', comprobanteEnviado: '', recibo: '', reclamos: '' }}
           title="Registrar gasto" saveLabel="Registrar gasto" showPagado={false}
           onSubmit={handleRegister} onClose={() => setShowModal(false)}
         />

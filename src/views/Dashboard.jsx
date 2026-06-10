@@ -6,7 +6,7 @@ import {
 } from 'recharts';
 import { KPICard } from '../components/UI/KPICard';
 import { SkeletonKPI, Skeleton } from '../components/UI/Skeleton';
-import { parseArgMoney, formatARS, parseDate, daysDiff, isEcheq, toTitleCase } from '../utils/formatters';
+import { parseArgMoney, formatARS, parseDate, daysDiff, toTitleCase } from '../utils/formatters';
 import { DollarSign, TrendingUp, Clock, AlertCircle, Receipt, CreditCard, CalendarClock } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -71,9 +71,9 @@ export default function Dashboard({ data, loading }) {
   const gastos = useMemo(() => {
     const rows = selectedMonth ? gastosPagos.filter(g => inMonth(g.fechaEmision)) : gastosPagos;
     const total = rows.reduce((s, g) => s + parseArgMoney(g.monto), 0);
-    const pagado = rows.filter(g => g.pagado).reduce((s, g) => s + parseArgMoney(g.monto), 0);
-    const proyectado = rows.filter(g => !g.pagado && isEcheq(g.formaPago) && g.fechaPago).reduce((s, g) => s + parseArgMoney(g.monto), 0);
-    const pendiente = rows.filter(g => !g.pagado && !(isEcheq(g.formaPago) && g.fechaPago)).reduce((s, g) => s + parseArgMoney(g.monto), 0);
+    const pagado = rows.filter(g => g.pagado || g.saldado).reduce((s, g) => s + parseArgMoney(g.monto), 0);
+    const proyectado = rows.filter(g => !g.pagado && !g.saldado && g.fechaPagoEcheq).reduce((s, g) => s + parseArgMoney(g.monto), 0);
+    const pendiente = rows.filter(g => !g.pagado && !g.saldado && !g.fechaPagoEcheq).reduce((s, g) => s + parseArgMoney(g.monto), 0);
     return { total, pagado, proyectado, pendiente };
   }, [gastosPagos, selectedMonth]);
 
@@ -108,7 +108,7 @@ export default function Dashboard({ data, loading }) {
       if (!map[prov]) map[prov] = { name: prov, monto: 0, vencidas: 0, proyectado: 0 };
       map[prov].monto += parseArgMoney(g.monto);
       if (daysDiff(parseDate(g.fechaEmision)) > 30) map[prov].vencidas++;
-      if (isEcheq(g.formaPago) && g.fechaPago) map[prov].proyectado += parseArgMoney(g.monto);
+      if (!g.pagado && !g.saldado && g.fechaPagoEcheq) map[prov].proyectado += parseArgMoney(g.monto);
     });
     return Object.values(map).sort((a, b) => b.monto - a.monto);
   }, [gastosPagos, selectedMonth]);

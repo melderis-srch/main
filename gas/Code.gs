@@ -287,6 +287,7 @@ function getVentasCobros() {
 // Col: 1=FechaEmision 2=NroFactura 3=Monto 4=Emisor 5=Categoria
 //      6=Descripcion 7=FechaPago 8=Pago(bool) 9=FormaPago
 //      10=ComprobanteEnviado 11=Recibo 12=Reclamos
+//      13=FechaPagoEcheq 14=Saldado(bool)
 // ============================================================
 function getGastosPagos() {
   var ss    = SpreadsheetApp.openById(FINANCIERO_SHEET_ID);
@@ -311,7 +312,9 @@ function getGastosPagos() {
       formaPago:          r[8]  || '',
       comprobanteEnviado: r[9]  || '',
       recibo:             r[10] || '',
-      reclamos:           r[11] || ''
+      reclamos:           r[11] || '',
+      fechaPagoEcheq:     formatFecha(r[12]),
+      saldado:            r[13] === true || String(r[13]).toUpperCase() === 'TRUE'
     });
   }
   return rows;
@@ -412,7 +415,8 @@ function updateGasto(rowIndex, fields) {
   var colMap = {
     fechaEmision:1, nroFactura:2, monto:3, emisor:4, categoria:5,
     descripcion:6, fechaPago:7, pagado:8, formaPago:9,
-    comprobanteEnviado:10, recibo:11, reclamos:12
+    comprobanteEnviado:10, recibo:11, reclamos:12,
+    fechaPagoEcheq:13, saldado:14
   };
   for (var key in fields) {
     if (colMap[key] !== undefined) sheet.getRange(rowIndex, colMap[key]).setValue(fields[key]);
@@ -428,7 +432,8 @@ function registrarGasto(data) {
     data.fechaEmision||'', data.nroFactura||'', data.monto||'',
     data.emisor||'', data.categoria||'', data.descripcion||'',
     data.fechaPago||'', false, data.formaPago||'',
-    data.comprobanteEnviado||'', data.recibo||'', data.reclamos||''
+    data.comprobanteEnviado||'', data.recibo||'', data.reclamos||'',
+    data.fechaPagoEcheq||'', false
   ]);
   return { appended: true };
 }
