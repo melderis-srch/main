@@ -36,7 +36,7 @@ export function KPICard({ label, value, sub, color, icon: Icon, hint }) {
       border: '1px solid #E5E7EB',
       borderRadius: 10,
       padding: '18px 20px',
-      borderLeft: `3px solid ${color || '#E8622A'}`,
+      borderLeft: `3px solid ${color || '#C05621'}`,
       display: 'flex', flexDirection: 'column', gap: 6
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -44,7 +44,7 @@ export function KPICard({ label, value, sub, color, icon: Icon, hint }) {
           {label}
           {hint && <Hint text={hint} />}
         </span>
-        {Icon && <Icon size={16} color={color || '#E8622A'} strokeWidth={2} />}
+        {Icon && <Icon size={16} color={color || '#C05621'} strokeWidth={2} />}
       </div>
       <div style={{ fontSize: 24, fontWeight: 700, color: '#111827', fontFamily: "'JetBrains Mono', monospace", letterSpacing: '-0.5px' }}>
         {value}

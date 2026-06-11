@@ -114,7 +114,7 @@ function CirugiaModal({ cirugia, onClose, onCobrar, addToast }) {
           </div>
           <div style={{ display: 'flex', gap: 8, paddingTop: 8, borderTop: '1px solid #E5E7EB' }}>
             <button onClick={handleSaveEdit} disabled={saving}
-              style={{ flex: 1, padding: '9px', background: '#E8622A', color: '#fff', border: 'none', borderRadius: 7, cursor: saving ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
+              style={{ flex: 1, padding: '9px', background: '#C05621', color: '#fff', border: 'none', borderRadius: 7, cursor: saving ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
               {saving ? 'Guardando...' : 'Guardar cambios'}
             </button>
             <button onClick={() => setEditMode(false)} style={{ padding: '9px 18px', background: '#F9FAFB', color: '#374151', border: '1px solid #E5E7EB', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontFamily: 'inherit' }}>Volver</button>
@@ -196,7 +196,7 @@ function CirugiaModal({ cirugia, onClose, onCobrar, addToast }) {
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
               <span style={{ fontSize: 14, color: '#374151' }}>Margen %</span>
-              <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 14, fontWeight: 700, color: '#E8622A' }}>
+              <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 14, fontWeight: 700, color: '#C05621' }}>
                 {formatPct(margen)}
               </span>
             </div>
@@ -213,7 +213,7 @@ function CirugiaModal({ cirugia, onClose, onCobrar, addToast }) {
               onClick={() => setShowCobrarForm(true)}
               style={{
                 width: '100%', padding: '11px',
-                background: '#E8622A', color: '#fff',
+                background: '#C05621', color: '#fff',
                 border: 'none', borderRadius: 8, cursor: 'pointer',
                 fontFamily: 'inherit', fontSize: 14, fontWeight: 600
               }}
@@ -235,7 +235,7 @@ function CirugiaModal({ cirugia, onClose, onCobrar, addToast }) {
               <button
                 onClick={handleCobrar}
                 disabled={saving}
-                style={{ padding: '9px 20px', background: '#E8622A', color: '#fff', border: 'none', borderRadius: 8, cursor: saving ? 'not-allowed' : 'pointer', fontFamily: 'inherit', fontSize: 14, fontWeight: 600 }}
+                style={{ padding: '9px 20px', background: '#C05621', color: '#fff', border: 'none', borderRadius: 8, cursor: saving ? 'not-allowed' : 'pointer', fontFamily: 'inherit', fontSize: 14, fontWeight: 600 }}
               >
                 {saving ? 'Guardando...' : 'Confirmar'}
               </button>
@@ -318,7 +318,7 @@ function NuevaCirugiaModal({ onClose, onSaved, addToast }) {
         <div style={{ display: 'flex', gap: 10, paddingTop: 8, borderTop: '1px solid #E5E7EB' }}>
           <button
             onClick={handleSave} disabled={saving}
-            style={{ flex: 1, padding: '10px', background: '#E8622A', color: '#fff', border: 'none', borderRadius: 8, cursor: saving ? 'not-allowed' : 'pointer', fontFamily: 'inherit', fontSize: 14, fontWeight: 600 }}
+            style={{ flex: 1, padding: '10px', background: '#C05621', color: '#fff', border: 'none', borderRadius: 8, cursor: saving ? 'not-allowed' : 'pointer', fontFamily: 'inherit', fontSize: 14, fontWeight: 600 }}
           >
             {saving ? 'Guardando...' : 'Guardar cirugía'}
           </button>
@@ -395,7 +395,7 @@ export default function Cirugias({ data, loading, refetch, addToast }) {
         </select>
         <button
           onClick={() => setShowNueva(true)}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', background: '#E8622A', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit', fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap' }}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', background: '#C05621', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit', fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap' }}
         >
           <Plus size={15} /> Nueva cirugía
         </button>
@@ -431,7 +431,7 @@ export default function Cirugias({ data, loading, refetch, addToast }) {
                       <td style={{ padding: '11px 14px', fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }}>{c.montoFactura ? formatARS(parseArgMoney(c.montoFactura)) : '—'}</td>
                       <td style={{ padding: '11px 14px', fontFamily: 'JetBrains Mono, monospace', fontSize: 13, color: '#6B7280' }}>{c.valorTotalCostos ? formatARS(parseArgMoney(c.valorTotalCostos)) : '—'}</td>
                       <td style={{ padding: '11px 14px', fontFamily: 'JetBrains Mono, monospace', fontSize: 13, color: parseArgMoney(c.facturaGastos) >= 0 ? '#059669' : '#DC2626' }}>{c.facturaGastos ? formatARS(parseArgMoney(c.facturaGastos)) : '—'}</td>
-                      <td style={{ padding: '11px 14px', fontFamily: 'JetBrains Mono, monospace', fontSize: 13, color: '#E8622A' }}>{c.pctMargen ? formatPct(parseArgMoney(c.pctMargen)) : '—'}</td>
+                      <td style={{ padding: '11px 14px', fontFamily: 'JetBrains Mono, monospace', fontSize: 13, color: '#C05621' }}>{c.pctMargen ? formatPct(parseArgMoney(c.pctMargen)) : '—'}</td>
                       <td style={{ padding: '11px 14px' }}><Badge type={getBadgeType(c)}>{getBadgeLabel(c)}</Badge></td>
                     </tr>
                   ))

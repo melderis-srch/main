@@ -123,7 +123,7 @@ export default function Calendario({ data, loading, addToast, refetch }) {
                   fontSize: 13, fontWeight: isToday ? 700 : 400,
                   color: isToday ? '#fff' : inMonth ? '#374151' : '#D1D5DB',
                   width: 24, height: 24, borderRadius: '50%',
-                  background: isToday ? '#E8622A' : 'transparent',
+                  background: isToday ? '#C05621' : 'transparent',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   marginBottom: 4
                 }}>

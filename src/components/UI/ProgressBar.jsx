@@ -1,4 +1,4 @@
-export function ProgressBar({ value, max = 100, color = '#E8622A', height = 8 }) {
+export function ProgressBar({ value, max = 100, color = '#C05621', height = 8 }) {
   const pct = Math.min(100, Math.max(0, (value / max) * 100));
   return (
     <div style={{
