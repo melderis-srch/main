@@ -213,6 +213,68 @@ function pctDelta(curr, prev) {
   return ((curr - prev) / Math.abs(prev)) * 100;
 }
 
+function DeudaOSRow({ os }) {
+  const [open, setOpen] = useState(false);
+  const months = Object.keys(os.byMonth).sort().reverse();
+  return (
+    <>
+      <tr onClick={() => setOpen(o=>!o)} style={{ borderBottom:'1px solid #F9FAFB', cursor:'pointer',
+        background: open ? '#FAFAFA' : '#fff' }}>
+        <td style={{ padding:'9px 16px', fontWeight:500, color:'#111827', display:'flex', alignItems:'center', gap:6 }}>
+          {open ? <ChevronDown size={12} color="#9CA3AF"/> : <ChevronRight size={12} color="#9CA3AF"/>}
+          {os.name}
+        </td>
+        <td style={{ padding:'9px 16px', textAlign:'right', color:'#9CA3AF', fontSize:12 }}>{os.facturas}</td>
+        <td style={{ padding:'9px 16px', textAlign:'right', fontVariantNumeric:'tabular-nums', fontWeight:600, color:RED }}>{formatARS(os.monto)}</td>
+        <td style={{ padding:'9px 16px', textAlign:'right', fontVariantNumeric:'tabular-nums', fontSize:12, color:BLUE }}>{os.echeq > 0 ? formatARS(os.echeq) : '—'}</td>
+      </tr>
+      {open && months.map(ym => {
+        const { monto, facturas } = os.byMonth[ym];
+        const label = ym === 'sin-fecha' ? 'Sin fecha' : format(parseISO(ym+'-01'), 'MMM yyyy', { locale:es });
+        return (
+          <tr key={ym} style={{ borderBottom:'1px solid #F9FAFB', background:'#F8FAFF' }}>
+            <td style={{ padding:'6px 16px 6px 36px', color:'#6B7280', fontSize:12 }}>{label}</td>
+            <td style={{ padding:'6px 16px', textAlign:'right', color:'#9CA3AF', fontSize:11 }}>{facturas}</td>
+            <td style={{ padding:'6px 16px', textAlign:'right', fontVariantNumeric:'tabular-nums', fontSize:12, color:RED }}>{formatARS(monto)}</td>
+            <td/>
+          </tr>
+        );
+      })}
+    </>
+  );
+}
+
+function DeudaProvRow({ p }) {
+  const [open, setOpen] = useState(false);
+  const months = Object.keys(p.byMonth).sort().reverse();
+  return (
+    <>
+      <tr onClick={() => setOpen(o=>!o)} style={{ borderBottom:'1px solid #F9FAFB', cursor:'pointer',
+        background: open ? '#FAFAFA' : '#fff' }}>
+        <td style={{ padding:'9px 16px', fontWeight:500, color:'#111827', display:'flex', alignItems:'center', gap:6 }}>
+          {open ? <ChevronDown size={12} color="#9CA3AF"/> : <ChevronRight size={12} color="#9CA3AF"/>}
+          {p.name}
+        </td>
+        <td style={{ padding:'9px 16px', textAlign:'right', color: p.vencidas>0 ? RED : '#9CA3AF', fontSize:12 }}>{p.vencidas > 0 ? p.vencidas : '—'}</td>
+        <td style={{ padding:'9px 16px', textAlign:'right', fontVariantNumeric:'tabular-nums', fontWeight:600, color:AMBER }}>{formatARS(p.monto)}</td>
+        <td style={{ padding:'9px 16px', textAlign:'right', fontVariantNumeric:'tabular-nums', fontSize:12, color:BLUE }}>{p.echeq > 0 ? formatARS(p.echeq) : '—'}</td>
+      </tr>
+      {open && months.map(ym => {
+        const { monto, facturas } = p.byMonth[ym];
+        const label = ym === 'sin-fecha' ? 'Sin fecha' : format(parseISO(ym+'-01'), 'MMM yyyy', { locale:es });
+        return (
+          <tr key={ym} style={{ borderBottom:'1px solid #F9FAFB', background:'#FFFDF5' }}>
+            <td style={{ padding:'6px 16px 6px 36px', color:'#6B7280', fontSize:12 }}>{label}</td>
+            <td/>
+            <td style={{ padding:'6px 16px', textAlign:'right', fontVariantNumeric:'tabular-nums', fontSize:12, color:AMBER }}>{formatARS(monto)}</td>
+            <td/>
+          </tr>
+        );
+      })}
+    </>
+  );
+}
+
 /* ── componente principal ────────────────────────────────── */
 export default function Dashboard({ data, loading }) {
   const { ventasCobros, gastosPagos } = data;
@@ -257,40 +319,45 @@ export default function Dashboard({ data, loading }) {
       .sort((a,b)=>b.value-a.value).slice(0,6);
   }, [gastosPagos, selectedMonth]);
 
+  // Deuda tables always show the full accumulated total, independent of selectedMonth
   const deudaOS = useMemo(() => {
-    const rows = selectedMonth
-      ? ventasCobros.filter(v => { const d=parseDate(v.fechaFactura); return d && format(d,'yyyy-MM')===selectedMonth; })
-      : ventasCobros;
     const map = {};
-    rows.forEach(v => {
+    ventasCobros.forEach(v => {
       if (v.fechaCobroReal) return;
       const os = toTitleCase(v.obraSocial)||'Sin OS';
-      if (!map[os]) map[os] = { name:os, monto:0, facturas:0, echeq:0 };
+      if (!map[os]) map[os] = { name:os, monto:0, facturas:0, echeq:0, byMonth:{} };
       map[os].monto += parseArgMoney(v.montoFacturado);
       map[os].facturas++;
       if (v.fechaCobroCheque) {
         const r = parseArgMoney(v.retGanancias)+parseArgMoney(v.retIIBB)+parseArgMoney(v.retSellados);
         map[os].echeq += parseArgMoney(v.montoFacturado)-r;
       }
+      const d = parseDate(v.fechaFactura);
+      const ym = d ? format(d,'yyyy-MM') : 'sin-fecha';
+      if (!map[os].byMonth[ym]) map[os].byMonth[ym] = { monto:0, facturas:0 };
+      map[os].byMonth[ym].monto += parseArgMoney(v.montoFacturado);
+      map[os].byMonth[ym].facturas++;
     });
     return Object.values(map).sort((a,b)=>b.monto-a.monto);
-  }, [ventasCobros, selectedMonth]);
+  }, [ventasCobros]);
 
   const deudaProveedores = useMemo(() => {
-    const rows = selectedMonth
-      ? gastosPagos.filter(g => { const d=parseDate(g.fechaEmision); return d && format(d,'yyyy-MM')===selectedMonth; })
-      : gastosPagos;
     const map = {};
-    rows.forEach(g => {
+    gastosPagos.forEach(g => {
       if (g.pagado||g.saldado) return;
       const prov = toTitleCase(g.emisor)||'Sin proveedor';
-      if (!map[prov]) map[prov] = { name:prov, monto:0, vencidas:0, echeq:0 };
+      if (!map[prov]) map[prov] = { name:prov, monto:0, vencidas:0, echeq:0, byMonth:{} };
       map[prov].monto += parseArgMoney(g.monto);
       if (daysDiff(parseDate(g.fechaEmision))>30) map[prov].vencidas++;
       if (g.fechaPagoEcheq && !g.saldado) map[prov].echeq += parseArgMoney(g.monto);
+      const d = parseDate(g.fechaEmision);
+      const ym = d ? format(d,'yyyy-MM') : 'sin-fecha';
+      if (!map[prov].byMonth[ym]) map[prov].byMonth[ym] = { monto:0, facturas:0 };
+      map[prov].byMonth[ym].monto += parseArgMoney(g.monto);
+      map[prov].byMonth[ym].facturas++;
     });
     return Object.values(map).sort((a,b)=>b.monto-a.monto);
-  }, [gastosPagos, selectedMonth]);
+  }, [gastosPagos]);
 
   const pm = prevMetrics;
 
@@ -449,14 +516,7 @@ export default function Dashboard({ data, loading }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {deudaOS.map((os,i) => (
-                    <tr key={i} style={{ borderBottom:'1px solid #F9FAFB' }}>
-                      <td style={{ padding:'9px 16px', fontWeight:500, color:'#111827' }}>{os.name}</td>
-                      <td style={{ padding:'9px 16px', textAlign:'right', color:'#9CA3AF', fontSize:12 }}>{os.facturas}</td>
-                      <td style={{ padding:'9px 16px', textAlign:'right', fontVariantNumeric:'tabular-nums', fontWeight:600, color:RED }}>{formatARS(os.monto)}</td>
-                      <td style={{ padding:'9px 16px', textAlign:'right', fontVariantNumeric:'tabular-nums', fontSize:12, color:BLUE }}>{os.echeq > 0 ? formatARS(os.echeq) : '—'}</td>
-                    </tr>
-                  ))}
+                  {deudaOS.map((os,i) => <DeudaOSRow key={i} os={os}/>)}
                 </tbody>
               </table>
             )
@@ -496,14 +556,7 @@ export default function Dashboard({ data, loading }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {deudaProveedores.map((p,i) => (
-                    <tr key={i} style={{ borderBottom:'1px solid #F9FAFB' }}>
-                      <td style={{ padding:'9px 16px', fontWeight:500, color:'#111827' }}>{p.name}</td>
-                      <td style={{ padding:'9px 16px', textAlign:'right', color: p.vencidas>0 ? RED : '#9CA3AF', fontSize:12 }}>{p.vencidas > 0 ? p.vencidas : '—'}</td>
-                      <td style={{ padding:'9px 16px', textAlign:'right', fontVariantNumeric:'tabular-nums', fontWeight:600, color:AMBER }}>{formatARS(p.monto)}</td>
-                      <td style={{ padding:'9px 16px', textAlign:'right', fontVariantNumeric:'tabular-nums', fontSize:12, color:BLUE }}>{p.echeq > 0 ? formatARS(p.echeq) : '—'}</td>
-                    </tr>
-                  ))}
+                  {deudaProveedores.map((p,i) => <DeudaProvRow key={i} p={p}/>)}
                 </tbody>
               </table>
             )
