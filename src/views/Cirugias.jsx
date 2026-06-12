@@ -47,7 +47,7 @@ function CostRow({ label, value, bold }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #F3F4F6', fontWeight: bold ? 700 : 400 }}>
       <span style={{ color: bold ? '#111827' : '#374151', fontSize: 14 }}>{label}</span>
-      <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 13, color: bold ? '#111827' : '#6B7280' }}>{formatARS(v)}</span>
+      <span style={{ fontVariantNumeric: 'tabular-nums', fontSize: 13, color: bold ? '#111827' : '#6B7280' }}>{formatARS(v)}</span>
     </div>
   );
 }
@@ -190,13 +190,13 @@ function CirugiaModal({ cirugia, onClose, onCobrar, addToast }) {
           <div style={{ background: '#F7F8FA', border: '1px solid #E5E7EB', borderRadius: 8, padding: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
               <span style={{ fontSize: 14, color: '#374151' }}>Factura - Gastos</span>
-              <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 14, fontWeight: 700, color: parseArgMoney(cirugia.facturaGastos) >= 0 ? '#059669' : '#DC2626' }}>
+              <span style={{ fontVariantNumeric: 'tabular-nums', fontSize: 14, fontWeight: 700, color: parseArgMoney(cirugia.facturaGastos) >= 0 ? '#059669' : '#DC2626' }}>
                 {formatARS(parseArgMoney(cirugia.facturaGastos))}
               </span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
               <span style={{ fontSize: 14, color: '#374151' }}>Margen %</span>
-              <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 14, fontWeight: 700, color: '#C05621' }}>
+              <span style={{ fontVariantNumeric: 'tabular-nums', fontSize: 14, fontWeight: 700, color: '#C05621' }}>
                 {formatPct(margen)}
               </span>
             </div>
@@ -428,10 +428,10 @@ export default function Cirugias({ data, loading, refetch, addToast }) {
                       <td style={{ padding: '11px 14px', color: '#374151' }}>{toTitleCase(c.medico)}</td>
                       <td style={{ padding: '11px 14px', color: '#374151' }}>{toTitleCase(c.obraSocial)}</td>
                       <td style={{ padding: '11px 14px', color: '#6B7280', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.consumo}</td>
-                      <td style={{ padding: '11px 14px', fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }}>{c.montoFactura ? formatARS(parseArgMoney(c.montoFactura)) : '—'}</td>
-                      <td style={{ padding: '11px 14px', fontFamily: 'JetBrains Mono, monospace', fontSize: 13, color: '#6B7280' }}>{c.valorTotalCostos ? formatARS(parseArgMoney(c.valorTotalCostos)) : '—'}</td>
-                      <td style={{ padding: '11px 14px', fontFamily: 'JetBrains Mono, monospace', fontSize: 13, color: parseArgMoney(c.facturaGastos) >= 0 ? '#059669' : '#DC2626' }}>{c.facturaGastos ? formatARS(parseArgMoney(c.facturaGastos)) : '—'}</td>
-                      <td style={{ padding: '11px 14px', fontFamily: 'JetBrains Mono, monospace', fontSize: 13, color: '#C05621' }}>{c.pctMargen ? formatPct(parseArgMoney(c.pctMargen)) : '—'}</td>
+                      <td style={{ padding: '11px 14px', fontVariantNumeric: 'tabular-nums', fontSize: 13 }}>{c.montoFactura ? formatARS(parseArgMoney(c.montoFactura)) : '—'}</td>
+                      <td style={{ padding: '11px 14px', fontVariantNumeric: 'tabular-nums', fontSize: 13, color: '#6B7280' }}>{c.valorTotalCostos ? formatARS(parseArgMoney(c.valorTotalCostos)) : '—'}</td>
+                      <td style={{ padding: '11px 14px', fontVariantNumeric: 'tabular-nums', fontSize: 13, color: parseArgMoney(c.facturaGastos) >= 0 ? '#059669' : '#DC2626' }}>{c.facturaGastos ? formatARS(parseArgMoney(c.facturaGastos)) : '—'}</td>
+                      <td style={{ padding: '11px 14px', fontVariantNumeric: 'tabular-nums', fontSize: 13, color: '#C05621' }}>{c.pctMargen ? formatPct(parseArgMoney(c.pctMargen)) : '—'}</td>
                       <td style={{ padding: '11px 14px' }}><Badge type={getBadgeType(c)}>{getBadgeLabel(c)}</Badge></td>
                     </tr>
                   ))

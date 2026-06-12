@@ -46,7 +46,7 @@ export function KPICard({ label, value, sub, color, icon: Icon, hint }) {
         </span>
         {Icon && <Icon size={16} color={color || '#C05621'} strokeWidth={2} />}
       </div>
-      <div style={{ fontSize: 24, fontWeight: 700, color: '#111827', fontFamily: "'JetBrains Mono', monospace", letterSpacing: '-0.5px' }}>
+      <div style={{ fontSize: 24, fontWeight: 700, color: '#111827', fontVariantNumeric: "tabular-nums", letterSpacing: '-0.5px' }}>
         {value}
       </div>
       {sub && <div style={{ fontSize: 12, color: '#9CA3AF' }}>{sub}</div>}

@@ -196,11 +196,11 @@ export default function Pagos({ data, loading, refetch, addToast }) {
                     return (
                       <tr key={i} style={{ borderBottom: '1px solid #F3F4F6', background: rowBg(estado) }}>
                         <td style={{ padding: '9px 12px', color: '#9CA3AF', fontSize: 12, whiteSpace: 'nowrap' }}>{g.fechaEmision}</td>
-                        <td style={{ padding: '9px 12px', fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}>{g.nroFactura}</td>
+                        <td style={{ padding: '9px 12px', fontVariantNumeric: 'tabular-nums', fontSize: 12 }}>{g.nroFactura}</td>
                         <td style={{ padding: '9px 12px', fontWeight: 500 }}>{toTitleCase(g.emisor)}</td>
                         <td style={{ padding: '9px 12px', color: '#6B7280' }}>{toTitleCase(g.categoria)}</td>
                         <td style={{ padding: '9px 12px', color: '#374151', maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={g.descripcion}>{toTitleCase(g.descripcion)}</td>
-                        <td style={{ padding: '9px 12px', fontFamily: 'JetBrains Mono, monospace', fontSize: 12, fontWeight: 600 }}>{formatARS(parseArgMoney(g.monto))}</td>
+                        <td style={{ padding: '9px 12px', fontVariantNumeric: 'tabular-nums', fontSize: 12, fontWeight: 600 }}>{formatARS(parseArgMoney(g.monto))}</td>
                         <td style={{ padding: '9px 12px', color: '#6B7280' }}>{toTitleCase(g.formaPago)}</td>
                         <td style={{ padding: '9px 12px', color: '#9CA3AF', fontSize: 12, whiteSpace: 'nowrap' }}>{g.fechaPago || '—'}</td>
                         <td style={{ padding: '9px 12px', fontSize: 12, whiteSpace: 'nowrap', fontWeight: g.fechaPagoEcheq ? 600 : 400, color: g.fechaPagoEcheq ? (g.saldado ? '#059669' : '#1D4ED8') : '#9CA3AF' }}>

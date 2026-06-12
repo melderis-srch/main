@@ -63,9 +63,9 @@ function CobroForm({ initial, title, saveLabel, onSubmit, onClose }) {
     <Modal open onClose={onClose} width={640} title={<span style={{ fontSize: 16, fontWeight: 700 }}>{title}</span>}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div style={{ background: '#F8FAFC', border: '1px solid #E5E7EB', borderRadius: 8, padding: '10px 14px', display: 'flex', gap: 20, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 13, color: '#6B7280' }}>Facturado: <strong style={{ color: '#111827', fontFamily: 'JetBrains Mono, monospace' }}>{formatARS(parseArgMoney(form.montoFacturado))}</strong></span>
-          <span style={{ fontSize: 13, color: '#6B7280' }}>Retenciones: <strong style={{ color: '#B91C1C', fontFamily: 'JetBrains Mono, monospace' }}>- {formatARS(retes)}</strong></span>
-          <span style={{ fontSize: 13, color: '#6B7280' }}>Neto: <strong style={{ color: '#059669', fontFamily: 'JetBrains Mono, monospace' }}>{formatARS(neto)}</strong></span>
+          <span style={{ fontSize: 13, color: '#6B7280' }}>Facturado: <strong style={{ color: '#111827', fontVariantNumeric: 'tabular-nums' }}>{formatARS(parseArgMoney(form.montoFacturado))}</strong></span>
+          <span style={{ fontSize: 13, color: '#6B7280' }}>Retenciones: <strong style={{ color: '#B91C1C', fontVariantNumeric: 'tabular-nums' }}>- {formatARS(retes)}</strong></span>
+          <span style={{ fontSize: 13, color: '#6B7280' }}>Neto: <strong style={{ color: '#059669', fontVariantNumeric: 'tabular-nums' }}>{formatARS(neto)}</strong></span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           {FIELDS_COBRO.map(({ k, label, placeholder }) => (
@@ -161,17 +161,17 @@ export default function Cobranzas({ data, loading, refetch, addToast }) {
         <div style={{ display: 'flex', alignItems: 'stretch', gap: 0, background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: '16px 22px', marginBottom: 20 }}>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
             <span style={{ fontSize: 11, color: '#6B7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Facturado</span>
-            <span style={{ fontSize: 22, fontWeight: 700, color: '#111827', fontFamily: 'JetBrains Mono, monospace' }}>{formatARS(kpis.facturado)}</span>
+            <span style={{ fontSize: 22, fontWeight: 700, color: '#111827', fontVariantNumeric: 'tabular-nums' }}>{formatARS(kpis.facturado)}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', color: '#D1D5DB', padding: '0 18px' }}><ArrowDownUp size={20} /></div>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
             <span style={{ fontSize: 11, color: '#6B7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ingresado (real)</span>
-            <span style={{ fontSize: 22, fontWeight: 700, color: '#059669', fontFamily: 'JetBrains Mono, monospace' }}>{formatARS(kpis.ingresado)}</span>
+            <span style={{ fontSize: 22, fontWeight: 700, color: '#059669', fontVariantNumeric: 'tabular-nums' }}>{formatARS(kpis.ingresado)}</span>
           </div>
           <div style={{ width: 1, background: '#E5E7EB', margin: '0 18px' }} />
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
             <span style={{ fontSize: 11, color: '#6B7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Diferencia (por ingresar)</span>
-            <span style={{ fontSize: 22, fontWeight: 700, color: kpis.porIngresar > 0 ? '#DC2626' : '#059669', fontFamily: 'JetBrains Mono, monospace' }}>{formatARS(kpis.porIngresar)}</span>
+            <span style={{ fontSize: 22, fontWeight: 700, color: kpis.porIngresar > 0 ? '#DC2626' : '#059669', fontVariantNumeric: 'tabular-nums' }}>{formatARS(kpis.porIngresar)}</span>
             <span style={{ fontSize: 11, color: '#9CA3AF' }}>{kpis.facturado > 0 ? `${Math.round((kpis.ingresado / kpis.facturado) * 100)}% cobrado` : '—'}</span>
           </div>
         </div>
@@ -215,14 +215,14 @@ export default function Cobranzas({ data, loading, refetch, addToast }) {
                       <tr key={i} style={{ borderBottom: '1px solid #F3F4F6', background: getRowBg(estado) }}>
                         <td style={{ padding: '9px 12px', fontWeight: 500 }}>{toTitleCase(v.paciente)}</td>
                         <td style={{ padding: '9px 12px', color: '#374151' }}>{toTitleCase(v.obraSocial)}</td>
-                        <td style={{ padding: '9px 12px', fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}>{v.nroFactura}</td>
-                        <td style={{ padding: '9px 12px', fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}>{formatARS(parseArgMoney(v.montoFacturado))}</td>
-                        <td style={{ padding: '9px 12px', fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: retes > 0 ? '#B91C1C' : '#9CA3AF' }}>{retes > 0 ? `- ${formatARS(retes)}` : '—'}</td>
-                        <td style={{ padding: '9px 12px', fontFamily: 'JetBrains Mono, monospace', fontSize: 12, fontWeight: 600, color: estado === 'cobrado' ? '#059669' : estado === 'proyectado' ? '#1D4ED8' : '#111827' }}>{formatARS(neto)}</td>
+                        <td style={{ padding: '9px 12px', fontVariantNumeric: 'tabular-nums', fontSize: 12 }}>{v.nroFactura}</td>
+                        <td style={{ padding: '9px 12px', fontVariantNumeric: 'tabular-nums', fontSize: 12 }}>{formatARS(parseArgMoney(v.montoFacturado))}</td>
+                        <td style={{ padding: '9px 12px', fontVariantNumeric: 'tabular-nums', fontSize: 12, color: retes > 0 ? '#B91C1C' : '#9CA3AF' }}>{retes > 0 ? `- ${formatARS(retes)}` : '—'}</td>
+                        <td style={{ padding: '9px 12px', fontVariantNumeric: 'tabular-nums', fontSize: 12, fontWeight: 600, color: estado === 'cobrado' ? '#059669' : estado === 'proyectado' ? '#1D4ED8' : '#111827' }}>{formatARS(neto)}</td>
                         <td style={{ padding: '9px 12px', color: '#6B7280' }}>{toTitleCase(v.medioPago)}</td>
                         <td style={{ padding: '9px 12px', color: '#9CA3AF', whiteSpace: 'nowrap', fontSize: 12 }}>{v.fechaCobroEsperada || '—'}</td>
                         <td style={{ padding: '9px 12px', color: estado === 'cobrado' ? '#059669' : '#1D4ED8', whiteSpace: 'nowrap', fontSize: 12 }}>{fechaDisplay}</td>
-                        <td style={{ padding: '9px 12px', fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: mora > 0 ? '#DC2626' : '#9CA3AF' }}>
+                        <td style={{ padding: '9px 12px', fontVariantNumeric: 'tabular-nums', fontSize: 12, color: mora > 0 ? '#DC2626' : '#9CA3AF' }}>
                           {mora !== null ? (mora > 0 ? `+${mora}d` : mora < 0 ? `${Math.abs(mora)}d` : 'Hoy') : '—'}
                         </td>
                         <td style={{ padding: '9px 12px' }}>

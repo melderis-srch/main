@@ -38,7 +38,7 @@ function CardHeader({ left, right }) {
     }}>
       <span style={{ fontSize:12, fontWeight:700, color:'#374151',
         textTransform:'uppercase', letterSpacing:'0.06em' }}>{left}</span>
-      {right && <span style={{ fontSize:13, fontFamily:'JetBrains Mono, monospace',
+      {right && <span style={{ fontSize:13, fontVariantNumeric:'tabular-nums',
         fontWeight:700, color:'#374151' }}>{right}</span>}
     </div>
   );
@@ -121,7 +121,7 @@ function SummaryRow({ label, value, delta, hint, accent, mono=true }) {
       <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:2 }}>
         <span style={{
           fontSize: accent ? 15 : 14, fontWeight: accent ? 700 : 600,
-          fontFamily: mono ? 'JetBrains Mono, monospace' : 'inherit',
+          fontVariantNumeric: mono ? 'tabular-nums' : 'normal',
           color: accent === 'green' ? GREEN : accent === 'red' ? RED
                : accent === 'orange' ? ORANGE : '#111827'
         }}>{value}</span>
@@ -141,7 +141,7 @@ function MiniKPI({ label, value, color, hint }) {
         {hint && <Hint text={hint}/>}
       </div>
       <span style={{
-        fontSize:16, fontWeight:700, fontFamily:'JetBrains Mono, monospace',
+        fontSize:16, fontWeight:700, fontVariantNumeric:'tabular-nums',
         color:'#111827', borderLeft:`2px solid ${color}`, paddingLeft:8
       }}>{value}</span>
     </div>
@@ -162,7 +162,7 @@ function PieLegend({ data }) {
             }}/>
             <span style={{ fontSize:12, color:'#374151' }}>{d.name}</span>
           </div>
-          <span style={{ fontSize:12, fontFamily:'JetBrains Mono, monospace',
+          <span style={{ fontSize:12, fontVariantNumeric:'tabular-nums',
             fontWeight:600, color:'#374151', whiteSpace:'nowrap' }}>
             {formatARS(d.value, true)}
           </span>
@@ -437,8 +437,8 @@ export default function Dashboard({ data, loading }) {
                     <tr key={i} style={{ borderBottom:'1px solid #F9FAFB' }}>
                       <td style={{ padding:'9px 16px', fontWeight:500, color:'#111827' }}>{os.name}</td>
                       <td style={{ padding:'9px 16px', textAlign:'right', color:'#9CA3AF', fontSize:12 }}>{os.facturas}</td>
-                      <td style={{ padding:'9px 16px', textAlign:'right', fontFamily:'JetBrains Mono, monospace', fontWeight:600, color:RED }}>{formatARS(os.monto)}</td>
-                      <td style={{ padding:'9px 16px', textAlign:'right', fontFamily:'JetBrains Mono, monospace', fontSize:12, color:BLUE }}>{os.echeq > 0 ? formatARS(os.echeq) : '—'}</td>
+                      <td style={{ padding:'9px 16px', textAlign:'right', fontVariantNumeric:'tabular-nums', fontWeight:600, color:RED }}>{formatARS(os.monto)}</td>
+                      <td style={{ padding:'9px 16px', textAlign:'right', fontVariantNumeric:'tabular-nums', fontSize:12, color:BLUE }}>{os.echeq > 0 ? formatARS(os.echeq) : '—'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -472,8 +472,8 @@ export default function Dashboard({ data, loading }) {
                     <tr key={i} style={{ borderBottom:'1px solid #F9FAFB' }}>
                       <td style={{ padding:'9px 16px', fontWeight:500, color:'#111827' }}>{p.name}</td>
                       <td style={{ padding:'9px 16px', textAlign:'right', color: p.vencidas>0 ? RED : '#9CA3AF', fontSize:12 }}>{p.vencidas > 0 ? p.vencidas : '—'}</td>
-                      <td style={{ padding:'9px 16px', textAlign:'right', fontFamily:'JetBrains Mono, monospace', fontWeight:600, color:AMBER }}>{formatARS(p.monto)}</td>
-                      <td style={{ padding:'9px 16px', textAlign:'right', fontFamily:'JetBrains Mono, monospace', fontSize:12, color:BLUE }}>{p.echeq > 0 ? formatARS(p.echeq) : '—'}</td>
+                      <td style={{ padding:'9px 16px', textAlign:'right', fontVariantNumeric:'tabular-nums', fontWeight:600, color:AMBER }}>{formatARS(p.monto)}</td>
+                      <td style={{ padding:'9px 16px', textAlign:'right', fontVariantNumeric:'tabular-nums', fontSize:12, color:BLUE }}>{p.echeq > 0 ? formatARS(p.echeq) : '—'}</td>
                     </tr>
                   ))}
                 </tbody>
