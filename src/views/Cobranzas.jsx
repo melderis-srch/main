@@ -48,6 +48,7 @@ const FIELDS_COBRO = [
   { k: 'fechaFactura', label: 'Fecha Factura', placeholder: 'dd/mm/yyyy' },
   { k: 'retGanancias', label: 'Ret. Ganancias' },
   { k: 'retIIBB', label: 'Ret. IIBB' },
+  { k: 'retSuss', label: 'Ret. SUSS' },
   { k: 'retSellados', label: 'Ret. Sellados' },
   { k: 'montoCobrado', label: 'Monto Cobrado' },
   { k: 'medioPago', label: 'Medio de Pago' },
@@ -64,7 +65,7 @@ function CobroForm({ initial, title, saveLabel, onSubmit, onClose }) {
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  const retes = parseArgMoney(form.retGanancias) + parseArgMoney(form.retIIBB) + parseArgMoney(form.retSellados);
+  const retes = parseArgMoney(form.retGanancias) + parseArgMoney(form.retIIBB) + parseArgMoney(form.retSuss) + parseArgMoney(form.retSellados);
   const neto = parseArgMoney(form.montoFacturado) - retes;
 
   const handleSave = async () => {
@@ -113,7 +114,7 @@ function EstadoBadge({ estado }) {
 function CobroRow({ v, onEdit, cols }) {
   const [open, setOpen] = useState(false);
   const estado = getEstado(v);
-  const retes = parseArgMoney(v.retGanancias) + parseArgMoney(v.retIIBB) + parseArgMoney(v.retSellados);
+  const retes = parseArgMoney(v.retGanancias) + parseArgMoney(v.retIIBB) + parseArgMoney(v.retSuss) + parseArgMoney(v.retSellados);
   const neto = parseArgMoney(v.montoFacturado) - retes;
   const mora = v.fechaCobroReal ? null : daysDiff(parseDate(v.fechaCobroEsperada));
   const fechaDisplay = v.fechaCobroReal ? v.fechaCobroReal : v.fechaCobroCheque ? `echeq ${v.fechaCobroCheque}` : '—';
@@ -157,6 +158,7 @@ function CobroRow({ v, onEdit, cols }) {
                 { label: 'Monto Facturado', value: formatARS(parseArgMoney(v.montoFacturado)) },
                 { label: 'Ret. Ganancias', value: formatARS(parseArgMoney(v.retGanancias)) },
                 { label: 'Ret. IIBB', value: formatARS(parseArgMoney(v.retIIBB)) },
+                { label: 'Ret. SUSS', value: formatARS(parseArgMoney(v.retSuss)) },
                 { label: 'Ret. Sellados', value: formatARS(parseArgMoney(v.retSellados)) },
                 { label: 'Monto Cobrado', value: v.montoCobrado ? formatARS(parseArgMoney(v.montoCobrado)) : '—' },
                 { label: 'Medio de Pago', value: toTitleCase(v.medioPago) || '—' },
@@ -190,11 +192,11 @@ function CobroRow({ v, onEdit, cols }) {
 function CobrosDelMes({ ym, rows, defaultOpen, onEdit }) {
   const [open, setOpen] = useState(defaultOpen);
   const totNeto = rows.reduce((s, v) => {
-    const r = parseArgMoney(v.retGanancias) + parseArgMoney(v.retIIBB) + parseArgMoney(v.retSellados);
+    const r = parseArgMoney(v.retGanancias) + parseArgMoney(v.retIIBB) + parseArgMoney(v.retSuss) + parseArgMoney(v.retSellados);
     return s + parseArgMoney(v.montoFacturado) - r;
   }, 0);
   const totRetes = rows.reduce((s, v) =>
-    s + parseArgMoney(v.retGanancias) + parseArgMoney(v.retIIBB) + parseArgMoney(v.retSellados), 0);
+    s + parseArgMoney(v.retGanancias) + parseArgMoney(v.retIIBB) + parseArgMoney(v.retSuss) + parseArgMoney(v.retSellados), 0);
 
   return (
     <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, overflow: 'hidden', marginBottom: 10 }}>
@@ -270,59 +272,114 @@ function FacturacionMes({ ym, rows, onEdit }) {
   );
 }
 
-/* ── Sección Retenciones IIBB ───────────────────────────── */
-function RetIIBBSection({ rows }) {
-  const [open, setOpen] = useState(false);
+/* ── Sección Retenciones (4 tipos) ──────────────────────── */
+const RET_TYPES = [
+  { key: 'retIIBB',      label: 'Ret. IIBB',      color: AMBER,    bg: '#FEF3C7', bgLight: '#FFFDF5', border: '#FEF3C7', textColor: '#92400E' },
+  { key: 'retGanancias', label: 'Ret. Ganancias',  color: '#7C3AED', bg: '#EDE9FE', bgLight: '#FAF5FF', border: '#DDD6FE', textColor: '#5B21B6' },
+  { key: 'retSuss',      label: 'Ret. SUSS',       color: '#0891B2', bg: '#CFFAFE', bgLight: '#F0FDFE', border: '#A5F3FC', textColor: '#155E75' },
+  { key: 'retSellados',  label: 'Ret. Sellados',   color: '#BE185D', bg: '#FCE7F3', bgLight: '#FFF1F8', border: '#FBCFE8', textColor: '#9D174D' },
+];
 
-  const withIIBB = useMemo(() =>
-    rows.filter(v => parseArgMoney(v.retIIBB) > 0)
+function RetMesGroup({ ym, rows, total, retKey, colors }) {
+  const [open, setOpen] = useState(false);
+  const { bg, bgLight, border, textColor, label: retLabel, color } = colors;
+
+  return (
+    <div style={{ border: `1px solid ${border}`, borderRadius: 8, overflow: 'hidden' }}>
+      <div onClick={() => setOpen(o => !o)}
+        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer', background: open ? bg : bgLight, borderBottom: open ? `1px solid ${border}` : 'none' }}>
+        {open ? <ChevronDown size={13} color={textColor} /> : <ChevronRight size={13} color={textColor} />}
+        <span style={{ fontSize: 13, fontWeight: 700, color: textColor, minWidth: 150 }}>{ymLabel(ym)}</span>
+        <span style={{ fontSize: 12, color: textColor, opacity: 0.7 }}>{rows.length} {rows.length === 1 ? 'factura' : 'facturas'}</span>
+        <div style={{ flex: 1 }} />
+        <span style={{ fontSize: 14, fontWeight: 700, color, fontVariantNumeric: 'tabular-nums' }}>{formatARS(total)}</span>
+      </div>
+
+      {open && (
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <thead>
+            <tr style={{ background: bg }}>
+              {['Paciente', 'Obra Social', 'N° Factura', 'F. Factura', 'F. Cobro Real', 'Facturado', retLabel].map(h => (
+                <th key={h} style={{ padding: '7px 14px', textAlign: h === retLabel || h === 'Facturado' ? 'right' : 'left', fontWeight: 600, color: textColor, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: `1px solid ${border}` }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((v, i) => (
+              <tr key={i} style={{ borderBottom: `1px solid ${bgLight}` }}>
+                <td style={{ padding: '8px 14px', fontWeight: 500, color: '#111827' }}>{toTitleCase(v.paciente)}</td>
+                <td style={{ padding: '8px 14px', color: '#374151' }}>{toTitleCase(v.obraSocial)}</td>
+                <td style={{ padding: '8px 14px', color: '#6B7280', fontVariantNumeric: 'tabular-nums' }}>{v.nroFactura || '—'}</td>
+                <td style={{ padding: '8px 14px', color: '#9CA3AF', whiteSpace: 'nowrap' }}>{v.fechaFactura || '—'}</td>
+                <td style={{ padding: '8px 14px', color: '#9CA3AF', whiteSpace: 'nowrap' }}>{v.fechaCobroReal || '—'}</td>
+                <td style={{ padding: '8px 14px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#374151' }}>{formatARS(parseArgMoney(v.montoFacturado))}</td>
+                <td style={{ padding: '8px 14px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700, color }}>{formatARS(parseArgMoney(v[retKey]))}</td>
+              </tr>
+            ))}
+            <tr style={{ background: bg }}>
+              <td colSpan={5} style={{ padding: '7px 14px', fontSize: 11, color: textColor, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Total mes</td>
+              <td />
+              <td style={{ padding: '7px 14px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700, color }}>{formatARS(total)}</td>
+            </tr>
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+function RetTipoSection({ rows, retType }) {
+  const [open, setOpen] = useState(false);
+  const { key, label, color, bg, bgLight, border, textColor } = retType;
+
+  const withRet = useMemo(() =>
+    rows.filter(v => parseArgMoney(v[key]) > 0)
         .sort((a, b) => {
           const da = parseDate(a.fechaCobroReal || a.fechaFactura);
           const db = parseDate(b.fechaCobroReal || b.fechaFactura);
           return (db ? db.getTime() : 0) - (da ? da.getTime() : 0);
         }),
-    [rows]
+    [rows, key]
   );
 
   const byMonth = useMemo(() => {
     const map = {};
-    withIIBB.forEach(v => {
+    withRet.forEach(v => {
       const d = parseDate(v.fechaCobroReal || v.fechaFactura);
       const ym = d ? format(d, 'yyyy-MM') : 'sin-fecha';
       if (!map[ym]) map[ym] = { ym, rows: [], total: 0 };
       map[ym].rows.push(v);
-      map[ym].total += parseArgMoney(v.retIIBB);
+      map[ym].total += parseArgMoney(v[key]);
     });
     return Object.values(map).sort((a, b) => b.ym.localeCompare(a.ym));
-  }, [withIIBB]);
+  }, [withRet, key]);
 
-  const totalIIBB = withIIBB.reduce((s, v) => s + parseArgMoney(v.retIIBB), 0);
+  const total = withRet.reduce((s, v) => s + parseArgMoney(v[key]), 0);
 
   return (
-    <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, overflow: 'hidden' }}>
-      {/* Header principal */}
+    <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, overflow: 'hidden', marginBottom: 10 }}>
       <div onClick={() => setOpen(o => !o)}
-        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 20px', cursor: 'pointer', borderBottom: open ? '1px solid #E5E7EB' : 'none', background: open ? '#FAFAFA' : '#fff' }}>
-        <Percent size={16} color={AMBER} strokeWidth={2} />
+        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px', cursor: 'pointer', borderBottom: open ? '1px solid #E5E7EB' : 'none', background: open ? '#FAFAFA' : '#fff' }}>
+        <div style={{ width: 4, height: 36, borderRadius: 2, background: color, flexShrink: 0 }} />
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>Retenciones IIBB</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>{label}</div>
           <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 1 }}>
-            {withIIBB.length} {withIIBB.length === 1 ? 'factura con retención' : 'facturas con retención'} · para enviar al contador
+            {withRet.length} {withRet.length === 1 ? 'factura con retención' : 'facturas con retención'}
           </div>
         </div>
         <div style={{ textAlign: 'right', marginRight: 8 }}>
           <div style={{ fontSize: 11, color: '#9CA3AF', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Total acumulado</div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: AMBER, fontVariantNumeric: 'tabular-nums' }}>{formatARS(totalIIBB)}</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color, fontVariantNumeric: 'tabular-nums' }}>{formatARS(total)}</div>
         </div>
         {open ? <ChevronDown size={16} color="#9CA3AF" /> : <ChevronRight size={16} color="#9CA3AF" />}
       </div>
 
       {open && (
-        <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
           {byMonth.length === 0
             ? <p style={{ color: '#9CA3AF', fontSize: 13, textAlign: 'center', margin: 0 }}>Sin retenciones registradas</p>
-            : byMonth.map(({ ym, rows: mrows, total }) => (
-                <IIBBMesGroup key={ym} ym={ym} rows={mrows} total={total} />
+            : byMonth.map(({ ym, rows: mrows, total: mtotal }) => (
+                <RetMesGroup key={ym} ym={ym} rows={mrows} total={mtotal} retKey={key} colors={retType} />
               ))
           }
         </div>
@@ -331,48 +388,45 @@ function RetIIBBSection({ rows }) {
   );
 }
 
-function IIBBMesGroup({ ym, rows, total }) {
+function RetencionesSectionWrapper({ rows }) {
   const [open, setOpen] = useState(false);
+  const totales = useMemo(() => {
+    return RET_TYPES.map(rt => ({
+      ...rt,
+      total: rows.reduce((s, v) => s + parseArgMoney(v[rt.key]), 0)
+    }));
+  }, [rows]);
+  const totalGlobal = totales.reduce((s, t) => s + t.total, 0);
 
   return (
-    <div style={{ border: '1px solid #FEF3C7', borderRadius: 8, overflow: 'hidden' }}>
+    <div>
+      {/* Header colapsable de la sección completa */}
       <div onClick={() => setOpen(o => !o)}
-        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer', background: open ? '#FFFBEB' : '#FFFDF5', borderBottom: open ? '1px solid #FEF3C7' : 'none' }}>
-        {open ? <ChevronDown size={13} color="#92400E" /> : <ChevronRight size={13} color="#92400E" />}
-        <span style={{ fontSize: 13, fontWeight: 700, color: '#92400E', minWidth: 150 }}>{ymLabel(ym)}</span>
-        <span style={{ fontSize: 12, color: '#A16207' }}>{rows.length} {rows.length === 1 ? 'factura' : 'facturas'}</span>
+        style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: open ? 12 : 0, cursor: 'pointer', userSelect: 'none' }}>
+        {open ? <ChevronDown size={15} color="#9CA3AF" /> : <ChevronRight size={15} color="#9CA3AF" />}
+        <Percent size={15} color={AMBER} strokeWidth={2} />
+        <span style={{ fontSize: 13, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Retenciones</span>
+        <span style={{ fontSize: 12, color: '#9CA3AF', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>— desglose por tipo · para el contador</span>
         <div style={{ flex: 1 }} />
-        <span style={{ fontSize: 14, fontWeight: 700, color: AMBER, fontVariantNumeric: 'tabular-nums' }}>{formatARS(total)}</span>
+        <span style={{ fontSize: 13, fontWeight: 700, color: '#374151', fontVariantNumeric: 'tabular-nums' }}>{formatARS(totalGlobal)}</span>
       </div>
 
       {open && (
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-          <thead>
-            <tr style={{ background: '#FFFBEB' }}>
-              {['Paciente', 'Obra Social', 'N° Factura', 'F. Factura', 'F. Cobro Real', 'Facturado', 'Ret. IIBB'].map(h => (
-                <th key={h} style={{ padding: '7px 14px', textAlign: h === 'Ret. IIBB' || h === 'Facturado' ? 'right' : 'left', fontWeight: 600, color: '#92400E', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #FEF3C7' }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((v, i) => (
-              <tr key={i} style={{ borderBottom: '1px solid #FEF9EB' }}>
-                <td style={{ padding: '8px 14px', fontWeight: 500, color: '#111827' }}>{toTitleCase(v.paciente)}</td>
-                <td style={{ padding: '8px 14px', color: '#374151' }}>{toTitleCase(v.obraSocial)}</td>
-                <td style={{ padding: '8px 14px', color: '#6B7280', fontVariantNumeric: 'tabular-nums' }}>{v.nroFactura || '—'}</td>
-                <td style={{ padding: '8px 14px', color: '#9CA3AF', whiteSpace: 'nowrap' }}>{v.fechaFactura || '—'}</td>
-                <td style={{ padding: '8px 14px', color: '#9CA3AF', whiteSpace: 'nowrap' }}>{v.fechaCobroReal || '—'}</td>
-                <td style={{ padding: '8px 14px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#374151' }}>{formatARS(parseArgMoney(v.montoFacturado))}</td>
-                <td style={{ padding: '8px 14px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700, color: AMBER }}>{formatARS(parseArgMoney(v.retIIBB))}</td>
-              </tr>
+        <>
+          {/* Mini resumen de los 4 tipos */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 14 }}>
+            {totales.map(({ key, label, color, total }) => (
+              <div key={key} style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 8, padding: '12px 16px', borderLeft: `3px solid ${color}` }}>
+                <div style={{ fontSize: 11, color: '#6B7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>{label}</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color, fontVariantNumeric: 'tabular-nums' }}>{formatARS(total)}</div>
+              </div>
             ))}
-            <tr style={{ background: '#FFFBEB' }}>
-              <td colSpan={5} style={{ padding: '7px 14px', fontSize: 11, color: '#92400E', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Total mes</td>
-              <td />
-              <td style={{ padding: '7px 14px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700, color: AMBER }}>{formatARS(total)}</td>
-            </tr>
-          </tbody>
-        </table>
+          </div>
+          {/* Sección por tipo */}
+          {totales.map(rt => (
+            <RetTipoSection key={rt.key} rows={rows} retType={rt} />
+          ))}
+        </>
       )}
     </div>
   );
@@ -395,27 +449,55 @@ function SectionBlock({ title, subtitle, icon: Icon, accentColor, defaultOpen = 
   );
 }
 
+const TABS = [
+  { id: 'cobros',      label: 'Cobros realizados' },
+  { id: 'facturacion', label: 'Facturación' },
+  { id: 'retenciones', label: 'Retenciones' },
+];
+
 /* ── Componente principal ───────────────────────────────── */
 export default function Cobranzas({ data, loading, refetch, addToast }) {
   const { ventasCobros } = data;
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [tab, setTab] = useState('cobros');
+  const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
 
   const currentYM = format(new Date(), 'yyyy-MM');
 
-  // Cobros realizados: agrupar por mes de fechaCobroReal
+  const allMonths = useMemo(() => {
+    const set = new Set();
+    ventasCobros.forEach(v => {
+      const d = parseDate(v.fechaCobroReal);
+      if (d) set.add(format(d, 'yyyy-MM'));
+    });
+    return Array.from(set).sort().reverse();
+  }, [ventasCobros]);
+
+  // Filtra por mes de cobro si hay selección, sino todos
+  const filteredCobros = useMemo(() => {
+    if (!selectedMonth) return ventasCobros.filter(v => v.fechaCobroReal);
+    return ventasCobros.filter(v => {
+      if (!v.fechaCobroReal) return false;
+      const d = parseDate(v.fechaCobroReal);
+      return d && format(d, 'yyyy-MM') === selectedMonth;
+    });
+  }, [ventasCobros, selectedMonth]);
+
+  // Cobros realizados agrupados por mes de fechaCobroReal
   const cobrosRealizados = useMemo(() => {
+    const src = selectedMonth ? filteredCobros : ventasCobros.filter(v => v.fechaCobroReal);
     const map = {};
-    ventasCobros.filter(v => v.fechaCobroReal).forEach(v => {
+    src.forEach(v => {
       const d = parseDate(v.fechaCobroReal);
       const ym = d ? format(d, 'yyyy-MM') : 'sin-fecha';
       if (!map[ym]) map[ym] = [];
       map[ym].push(v);
     });
     return Object.keys(map).sort().reverse().map(k => ({ ym: k, rows: map[k] }));
-  }, [ventasCobros]);
+  }, [filteredCobros, selectedMonth, ventasCobros]);
 
-  // Facturación: agrupar por mes de fechaFactura
+  // Facturación agrupada por mes de fechaFactura (sin filtro de mes)
   const facturacion = useMemo(() => {
     const map = {};
     ventasCobros.forEach(v => {
@@ -427,20 +509,29 @@ export default function Cobranzas({ data, loading, refetch, addToast }) {
     return Object.keys(map).sort().reverse().map(k => ({ ym: k, rows: map[k] }));
   }, [ventasCobros]);
 
+  // KPIs filtrados por mes seleccionado
   const kpis = useMemo(() => {
-    const facturado = ventasCobros.reduce((s, v) => s + parseArgMoney(v.montoFacturado), 0);
-    const ingresado = ventasCobros.filter(v => v.fechaCobroReal).reduce((s, v) => {
-      const r = parseArgMoney(v.retGanancias) + parseArgMoney(v.retIIBB) + parseArgMoney(v.retSellados);
+    const base = selectedMonth ? filteredCobros : ventasCobros.filter(v => v.fechaCobroReal);
+    const ingresado = base.reduce((s, v) => {
+      const r = parseArgMoney(v.retGanancias) + parseArgMoney(v.retIIBB) + parseArgMoney(v.retSuss) + parseArgMoney(v.retSellados);
       return s + parseArgMoney(v.montoFacturado) - r;
     }, 0);
-    const proyectado = ventasCobros.filter(v => !v.fechaCobroReal && v.fechaCobroCheque).reduce((s, v) => {
-      const r = parseArgMoney(v.retGanancias) + parseArgMoney(v.retIIBB) + parseArgMoney(v.retSellados);
+    const proyectado = ventasCobros.filter(v => {
+      if (v.fechaCobroReal || !v.fechaCobroCheque) return false;
+      if (!selectedMonth) return true;
+      const d = parseDate(v.fechaCobroCheque);
+      return d && format(d, 'yyyy-MM') === selectedMonth;
+    }).reduce((s, v) => {
+      const r = parseArgMoney(v.retGanancias) + parseArgMoney(v.retIIBB) + parseArgMoney(v.retSuss) + parseArgMoney(v.retSellados);
       return s + parseArgMoney(v.montoFacturado) - r;
     }, 0);
-    const pendiente = ventasCobros.filter(v => !v.fechaCobroReal && !v.fechaCobroCheque).reduce((s, v) => s + parseArgMoney(v.montoFacturado), 0);
+    const pendiente = ventasCobros
+      .filter(v => !v.fechaCobroReal && !v.fechaCobroCheque)
+      .reduce((s, v) => s + parseArgMoney(v.montoFacturado), 0);
+    const facturado = base.reduce((s, v) => s + parseArgMoney(v.montoFacturado), 0);
     const porIngresar = facturado - ingresado;
     return { facturado, ingresado, proyectado, pendiente, porIngresar };
-  }, [ventasCobros]);
+  }, [filteredCobros, selectedMonth, ventasCobros]);
 
   const handleEdit = async (form) => {
     try {
@@ -463,50 +554,73 @@ export default function Cobranzas({ data, loading, refetch, addToast }) {
 
   return (
     <div>
+      {/* Selector de mes + botón */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <label style={{ fontSize: 13, color: '#6B7280', fontWeight: 500 }}>Período:</label>
+          <select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}
+            style={{ padding: '6px 12px', border: '1px solid #E5E7EB', borderRadius: 7, fontSize: 13, fontFamily: 'inherit', background: '#fff', color: '#111827', cursor: 'pointer' }}>
+            <option value="">Acumulado total</option>
+            {allMonths.map(m => (
+              <option key={m} value={m}>{ymLabel(m)}</option>
+            ))}
+          </select>
+        </div>
+        <button onClick={() => setShowModal(true)}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', background: ORANGE, color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
+          <Plus size={14} /> Registrar cobro
+        </button>
+      </div>
+
       {/* KPIs */}
       {loading
         ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 20 }}>{Array(4).fill(0).map((_, i) => <SkeletonKPI key={i} />)}</div>
         : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 20 }}>
-            <KPICard label="Facturado" value={formatARS(kpis.facturado)} icon={TrendingUp} color="#6B7280"
-              hint="Total emitido en facturas. Lo que se debería cobrar." />
-            <KPICard label="Ingresado" value={formatARS(kpis.ingresado)} icon={TrendingUp} color={GREEN}
-              hint="Dinero efectivamente recibido (con Fecha de cobro REAL cargada), neto de retenciones." />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 16 }}>
+            <KPICard label="Cobrado (neto)" value={formatARS(kpis.ingresado)} icon={TrendingUp} color={GREEN}
+              hint="Dinero efectivamente recibido en el período, neto de todas las retenciones." />
             <KPICard label="Proyectado (echeq)" value={formatARS(kpis.proyectado)} icon={CalendarClock} color={BLUE}
               hint="Cheques/echeq sin acreditar todavía, netos de retenciones." />
             <KPICard label="Pendiente" value={formatARS(kpis.pendiente)} icon={Clock} color={RED}
               hint="Facturado sin cobro real ni cheque en circulación." />
+            <KPICard label="Facturado base" value={formatARS(kpis.facturado)} icon={TrendingUp} color="#6B7280"
+              hint="Total bruto cobrado en el período, antes de retenciones." />
           </div>
         )
       }
 
       {/* Banner facturado vs ingresado */}
       {!loading && (
-        <div style={{ display: 'flex', alignItems: 'stretch', gap: 0, background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: '16px 22px', marginBottom: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'stretch', gap: 0, background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: '14px 22px', marginBottom: 20 }}>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
             <span style={{ fontSize: 11, color: '#6B7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Facturado</span>
-            <span style={{ fontSize: 22, fontWeight: 700, color: '#111827', fontVariantNumeric: 'tabular-nums' }}>{formatARS(kpis.facturado)}</span>
+            <span style={{ fontSize: 20, fontWeight: 700, color: '#111827', fontVariantNumeric: 'tabular-nums' }}>{formatARS(kpis.facturado)}</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', color: '#D1D5DB', padding: '0 18px' }}><ArrowDownUp size={20} /></div>
+          <div style={{ display: 'flex', alignItems: 'center', color: '#D1D5DB', padding: '0 18px' }}><ArrowDownUp size={18} /></div>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{ fontSize: 11, color: '#6B7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ingresado (real)</span>
-            <span style={{ fontSize: 22, fontWeight: 700, color: GREEN, fontVariantNumeric: 'tabular-nums' }}>{formatARS(kpis.ingresado)}</span>
+            <span style={{ fontSize: 11, color: '#6B7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Cobrado neto</span>
+            <span style={{ fontSize: 20, fontWeight: 700, color: GREEN, fontVariantNumeric: 'tabular-nums' }}>{formatARS(kpis.ingresado)}</span>
           </div>
           <div style={{ width: 1, background: '#E5E7EB', margin: '0 18px' }} />
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{ fontSize: 11, color: '#6B7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Diferencia (por ingresar)</span>
-            <span style={{ fontSize: 22, fontWeight: 700, color: kpis.porIngresar > 0 ? RED : GREEN, fontVariantNumeric: 'tabular-nums' }}>{formatARS(kpis.porIngresar)}</span>
+            <span style={{ fontSize: 11, color: '#6B7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Diferencia (por cobrar)</span>
+            <span style={{ fontSize: 20, fontWeight: 700, color: kpis.porIngresar > 0 ? RED : GREEN, fontVariantNumeric: 'tabular-nums' }}>{formatARS(kpis.porIngresar)}</span>
             <span style={{ fontSize: 11, color: '#9CA3AF' }}>{kpis.facturado > 0 ? `${Math.round((kpis.ingresado / kpis.facturado) * 100)}% cobrado` : '—'}</span>
           </div>
         </div>
       )}
 
-      {/* Botón registrar */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: 20 }}>
-        <button onClick={() => setShowModal(true)}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', background: ORANGE, color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
-          <Plus size={14} /> Registrar cobro
-        </button>
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: 2, background: '#F3F4F6', borderRadius: 9, padding: 3, marginBottom: 20, width: 'fit-content' }}>
+        {TABS.map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)}
+            style={{ padding: '6px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: tab === t.id ? 600 : 500, fontFamily: 'inherit',
+              background: tab === t.id ? '#fff' : 'transparent',
+              color: tab === t.id ? '#111827' : '#6B7280',
+              boxShadow: tab === t.id ? '0 1px 3px rgba(0,0,0,0.08)' : 'none' }}>
+            {t.label}
+          </button>
+        ))}
       </div>
 
       {loading ? (
@@ -515,31 +629,33 @@ export default function Cobranzas({ data, loading, refetch, addToast }) {
         </div>
       ) : (
         <>
-          {/* SECCIÓN 1: Cobros realizados por mes */}
-          <SectionBlock title="Cobros realizados" subtitle="— por fecha de ingreso real" icon={TrendingUp} accentColor={GREEN} defaultOpen>
-            {cobrosRealizados.length === 0
-              ? <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 32, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>Sin cobros registrados</div>
+          {tab === 'cobros' && (
+            cobrosRealizados.length === 0
+              ? <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 40, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>
+                  {selectedMonth ? `Sin cobros en ${ymLabel(selectedMonth)}` : 'Sin cobros registrados'}
+                </div>
               : cobrosRealizados.map(({ ym, rows }) => (
-                  <CobrosDelMes key={ym} ym={ym} rows={rows} defaultOpen={ym === currentYM} onEdit={setEditing} />
+                  <CobrosDelMes key={ym} ym={ym} rows={rows} defaultOpen={ym === currentYM || !!selectedMonth} onEdit={setEditing} />
                 ))
-            }
-          </SectionBlock>
+          )}
 
-          {/* SECCIÓN 2: Facturación por mes */}
-          <SectionBlock title="Facturación" subtitle="— por fecha de emisión de factura" icon={FileText} accentColor="#6B7280">
-            {facturacion.map(({ ym, rows }) => (
-              <FacturacionMes key={ym} ym={ym} rows={rows} onEdit={setEditing} />
-            ))}
-          </SectionBlock>
+          {tab === 'facturacion' && (
+            facturacion.length === 0
+              ? <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 40, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>Sin facturación registrada</div>
+              : facturacion.map(({ ym, rows }) => (
+                  <FacturacionMes key={ym} ym={ym} rows={rows} onEdit={setEditing} />
+                ))
+          )}
 
-          {/* SECCIÓN 3: Retenciones IIBB */}
-          <RetIIBBSection rows={ventasCobros} />
+          {tab === 'retenciones' && (
+            <RetencionesSectionWrapper rows={ventasCobros} />
+          )}
         </>
       )}
 
       {showModal && (
         <CobroForm
-          initial={{ paciente: '', obraSocial: '', nroFactura: '', montoFacturado: '', fechaFactura: '', retGanancias: '', retIIBB: '', retSellados: '', montoCobrado: '', medioPago: '', lugarPago: '', condicionPago: '', fechaCobroEsperada: '', fechaCobroReal: '', fechaCobroCheque: '' }}
+          initial={{ paciente: '', obraSocial: '', nroFactura: '', montoFacturado: '', fechaFactura: '', retGanancias: '', retIIBB: '', retSuss: '', retSellados: '', montoCobrado: '', medioPago: '', lugarPago: '', condicionPago: '', fechaCobroEsperada: '', fechaCobroReal: '', fechaCobroCheque: '' }}
           title="Registrar cobro" saveLabel="Registrar cobro"
           onSubmit={handleRegister} onClose={() => setShowModal(false)}
         />

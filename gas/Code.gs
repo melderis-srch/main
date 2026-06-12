@@ -249,6 +249,7 @@ function getConsolidado() {
 //      5=FechaFactura 6=RetGanancias 7=RetIIBB 8=RetSellados
 //      9=MontoCobrado 10=MedioPago 11=LugarPago 12=CondicionPago
 //      13=FechaCobroEsperada 14=FechaCobroReal 15=FechaCobroCheque
+//      16=RetSuss
 // ============================================================
 function getVentasCobros() {
   var ss    = SpreadsheetApp.openById(FINANCIERO_SHEET_ID);
@@ -276,7 +277,8 @@ function getVentasCobros() {
       condicionPago:      r[11] || '',
       fechaCobroEsperada: formatFecha(r[12]),
       fechaCobroReal:     formatFecha(r[13]),
-      fechaCobroCheque:   formatFecha(r[14])
+      fechaCobroCheque:   formatFecha(r[14]),
+      retSuss:            r[15] || ''
     });
   }
   return rows;
@@ -367,7 +369,7 @@ function registrarCobro(data) {
     data.retGanancias||'', data.retIIBB||'', data.retSellados||'',
     data.montoCobrado||'', data.medioPago||'', data.lugarPago||'',
     data.condicionPago||'', data.fechaCobroEsperada||'',
-    data.fechaCobroReal||'', data.fechaCobroCheque||''
+    data.fechaCobroReal||'', data.fechaCobroCheque||'', data.retSuss||''
   ]);
   return { appended: true };
 }
@@ -399,7 +401,8 @@ function updateCobro(rowIndex, fields) {
   var colMap = {
     paciente:1, obraSocial:2, nroFactura:3, montoFacturado:4, fechaFactura:5,
     retGanancias:6, retIIBB:7, retSellados:8, montoCobrado:9, medioPago:10,
-    lugarPago:11, condicionPago:12, fechaCobroEsperada:13, fechaCobroReal:14, fechaCobroCheque:15
+    lugarPago:11, condicionPago:12, fechaCobroEsperada:13, fechaCobroReal:14,
+    fechaCobroCheque:15, retSuss:16
   };
   for (var key in fields) {
     if (colMap[key] !== undefined) sheet.getRange(rowIndex, colMap[key]).setValue(fields[key]);
