@@ -35,11 +35,17 @@ export function formatPct(value) {
   return num.toFixed(1).replace('.', ',') + '%';
 }
 
-// Parse "dd/MM/yyyy" string → Date object
+// Parse "dd/MM/yyyy" string → Date object (también maneja ISO strings)
 export function parseDate(str) {
   if (!str) return null;
+  const s = String(str).trim();
   try {
-    const d = parse(str, 'dd/MM/yyyy', new Date());
+    // ISO format: "2025-01-16T03:00:00.000Z" o "2025-01-16"
+    if (s.includes('T') || /^\d{4}-\d{2}-\d{2}$/.test(s)) {
+      const d = new Date(s);
+      return isValid(d) ? d : null;
+    }
+    const d = parse(s, 'dd/MM/yyyy', new Date());
     return isValid(d) ? d : null;
   } catch {
     return null;
