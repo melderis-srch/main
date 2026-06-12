@@ -1,6 +1,6 @@
 'use client';
 import { useState, useMemo } from 'react';
-import { Plus, Pencil } from 'lucide-react';
+import { Plus, Pencil, ChevronDown, ChevronRight } from 'lucide-react';
 import { Badge } from '../components/UI/Badge';
 import { Modal } from '../components/UI/Modal';
 import { KPICard } from '../components/UI/KPICard';
@@ -88,37 +88,165 @@ function CobroForm({ initial, title, saveLabel, onSubmit, onClose }) {
   );
 }
 
+function EstadoBadge({ estado }) {
+  if (estado === 'cobrado') return <Badge type="cobrado">Cobrado</Badge>;
+  if (estado === 'proyectado') return <Badge type="proyectado">Echeq</Badge>;
+  if (estado === 'vencido') return <Badge type="vencido">Vencido</Badge>;
+  if (estado === 'porVencer') return <Badge type="porVencer">Por vencer</Badge>;
+  return <Badge type="pendiente">Pendiente</Badge>;
+}
+
+function CobroRow({ v, onEdit }) {
+  const [open, setOpen] = useState(false);
+  const estado = getEstado(v);
+  const retes = parseArgMoney(v.retGanancias) + parseArgMoney(v.retIIBB) + parseArgMoney(v.retSellados);
+  const neto = parseArgMoney(v.montoFacturado) - retes;
+  const mora = v.fechaCobroReal ? null : daysDiff(parseDate(v.fechaCobroEsperada));
+  const fechaDisplay = v.fechaCobroReal ? v.fechaCobroReal : v.fechaCobroCheque ? `echeq ${v.fechaCobroCheque}` : '—';
+
+  return (
+    <>
+      <tr
+        onClick={() => setOpen(o => !o)}
+        style={{ borderBottom: open ? 'none' : '1px solid #F3F4F6', background: getRowBg(estado), cursor: 'pointer' }}
+      >
+        <td style={{ padding: '10px 12px', width: 28 }}>
+          {open
+            ? <ChevronDown size={14} color="#9CA3AF" />
+            : <ChevronRight size={14} color="#9CA3AF" />}
+        </td>
+        <td style={{ padding: '10px 12px', fontWeight: 500 }}>{toTitleCase(v.paciente)}</td>
+        <td style={{ padding: '10px 12px', color: '#374151' }}>{toTitleCase(v.obraSocial)}</td>
+        <td style={{ padding: '10px 12px', fontVariantNumeric: 'tabular-nums', fontSize: 12, color: '#6B7280' }}>{v.nroFactura || '—'}</td>
+        <td style={{ padding: '10px 12px', fontVariantNumeric: 'tabular-nums', fontSize: 12, color: '#9CA3AF', whiteSpace: 'nowrap' }}>{v.fechaFactura || '—'}</td>
+        <td style={{ padding: '10px 12px', fontVariantNumeric: 'tabular-nums', fontSize: 12, fontWeight: 600, color: estado === 'cobrado' ? '#059669' : estado === 'proyectado' ? '#1D4ED8' : '#111827' }}>
+          {formatARS(neto)}
+        </td>
+        <td style={{ padding: '10px 12px', color: estado === 'cobrado' ? '#059669' : '#1D4ED8', whiteSpace: 'nowrap', fontSize: 12 }}>{fechaDisplay}</td>
+        <td style={{ padding: '10px 12px', fontVariantNumeric: 'tabular-nums', fontSize: 12, color: mora > 0 ? '#DC2626' : '#9CA3AF' }}>
+          {mora !== null ? (mora > 0 ? `+${mora}d` : mora < 0 ? `${Math.abs(mora)}d` : 'Hoy') : '—'}
+        </td>
+        <td style={{ padding: '10px 12px' }}><EstadoBadge estado={estado} /></td>
+      </tr>
+
+      {open && (
+        <tr style={{ borderBottom: '1px solid #F3F4F6', background: '#F8FAFC' }}>
+          <td />
+          <td colSpan={8} style={{ padding: '0 12px 14px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px 24px', paddingTop: 10 }}>
+              {[
+                { label: 'Monto Facturado', value: formatARS(parseArgMoney(v.montoFacturado)) },
+                { label: 'Ret. Ganancias', value: formatARS(parseArgMoney(v.retGanancias)) },
+                { label: 'Ret. IIBB', value: formatARS(parseArgMoney(v.retIIBB)) },
+                { label: 'Ret. Sellados', value: formatARS(parseArgMoney(v.retSellados)) },
+                { label: 'Monto Cobrado', value: v.montoCobrado ? formatARS(parseArgMoney(v.montoCobrado)) : '—' },
+                { label: 'Medio de Pago', value: toTitleCase(v.medioPago) || '—' },
+                { label: 'Lugar de Pago', value: toTitleCase(v.lugarPago) || '—' },
+                { label: 'Condición de Pago', value: toTitleCase(v.condicionPago) || '—' },
+                { label: 'F. Cobro Esperada', value: v.fechaCobroEsperada || '—' },
+                { label: 'F. Cobro Real', value: v.fechaCobroReal || '—' },
+                { label: 'F. Acred. Cheque/Echeq', value: v.fechaCobroCheque || '—' },
+              ].map(({ label, value }) => (
+                <div key={label}>
+                  <div style={{ fontSize: 11, color: '#9CA3AF', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 2 }}>{label}</div>
+                  <div style={{ fontSize: 13, color: '#111827', fontVariantNumeric: 'tabular-nums' }}>{value}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ marginTop: 10 }}>
+              <button onClick={e => { e.stopPropagation(); onEdit(v); }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 12px', background: 'none', border: '1px solid #E5E7EB', borderRadius: 6, cursor: 'pointer', color: '#6B7280', fontSize: 12, fontFamily: 'inherit' }}>
+                <Pencil size={12} /> Editar cobro
+              </button>
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
+function MonthGroup({ yyyymm, rows, defaultOpen, onEdit }) {
+  const [open, setOpen] = useState(defaultOpen);
+
+  const label = format(parseISO(yyyymm + '-01'), 'MMMM yyyy', { locale: es });
+  const labelCap = label.charAt(0).toUpperCase() + label.slice(1);
+
+  const totFact = rows.reduce((s, v) => s + parseArgMoney(v.montoFacturado), 0);
+  const totIngresado = rows.filter(v => v.fechaCobroReal).reduce((s, v) => {
+    const retes = parseArgMoney(v.retGanancias) + parseArgMoney(v.retIIBB) + parseArgMoney(v.retSellados);
+    return s + parseArgMoney(v.montoFacturado) - retes;
+  }, 0);
+  const cobradas = rows.filter(v => v.fechaCobroReal).length;
+
+  return (
+    <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, overflow: 'hidden', marginBottom: 10 }}>
+      <div
+        onClick={() => setOpen(o => !o)}
+        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', cursor: 'pointer', borderBottom: open ? '1px solid #F3F4F6' : 'none', background: open ? '#FAFAFA' : '#fff' }}
+      >
+        {open ? <ChevronDown size={15} color="#9CA3AF" /> : <ChevronRight size={15} color="#9CA3AF" />}
+        <span style={{ fontSize: 14, fontWeight: 700, color: '#111827', minWidth: 140 }}>{labelCap}</span>
+        <span style={{ fontSize: 12, color: '#9CA3AF', marginRight: 4 }}>{rows.length} cobros</span>
+        <span style={{ fontSize: 11, background: '#ECFDF5', color: '#065F46', border: '1px solid #A7F3D0', borderRadius: 20, padding: '1px 8px', fontWeight: 600 }}>
+          {cobradas}/{rows.length} cobrados
+        </span>
+        <div style={{ flex: 1 }} />
+        <span style={{ fontSize: 12, color: '#6B7280', marginRight: 6 }}>Facturado:</span>
+        <span style={{ fontSize: 14, fontWeight: 700, color: '#111827', fontVariantNumeric: 'tabular-nums', marginRight: 20 }}>{formatARS(totFact)}</span>
+        <span style={{ fontSize: 12, color: '#6B7280', marginRight: 6 }}>Ingresado:</span>
+        <span style={{ fontSize: 14, fontWeight: 700, color: '#059669', fontVariantNumeric: 'tabular-nums' }}>{formatARS(totIngresado)}</span>
+      </div>
+
+      {open && (
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <thead>
+            <tr style={{ background: '#F9FAFB' }}>
+              <th style={{ width: 28 }} />
+              {['Paciente', 'Obra Social', 'N° Factura', 'Fecha', 'Neto', 'F. Real / Echeq', 'Mora', 'Estado'].map(h => (
+                <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: '#9CA3AF', fontSize: 11, whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((v, i) => <CobroRow key={i} v={v} onEdit={onEdit} />)}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
 export default function Cobranzas({ data, loading, refetch, addToast }) {
   const { ventasCobros } = data;
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [selectedMonth, setSelectedMonth] = useState('');
 
-  const allMonths = useMemo(() => {
-    const set = new Set();
-    ventasCobros.forEach(v => { const d = parseDate(v.fechaFactura); if (d) set.add(format(d, 'yyyy-MM')); });
-    return Array.from(set).sort().reverse();
+  const currentYM = format(new Date(), 'yyyy-MM');
+
+  const grouped = useMemo(() => {
+    const map = {};
+    ventasCobros.forEach(v => {
+      const d = parseDate(v.fechaFactura);
+      const ym = d ? format(d, 'yyyy-MM') : 'sin-fecha';
+      if (!map[ym]) map[ym] = [];
+      map[ym].push(v);
+    });
+    const keys = Object.keys(map).sort().reverse();
+    return keys.map(k => ({ ym: k, rows: map[k] }));
   }, [ventasCobros]);
 
-  const filtered = useMemo(() => {
-    if (!selectedMonth) return ventasCobros;
-    return ventasCobros.filter(v => {
-      const d = parseDate(v.fechaFactura);
-      return d && format(d, 'yyyy-MM') === selectedMonth;
-    });
-  }, [ventasCobros, selectedMonth]);
-
   const kpis = useMemo(() => {
-    const facturado = filtered.reduce((s, v) => s + parseArgMoney(v.montoFacturado), 0);
-    const ingresado = filtered.filter(v => v.fechaCobroReal).reduce((s, v) => s + parseArgMoney(v.montoCobrado || v.montoFacturado), 0);
-    const proyectado = filtered.filter(v => !v.fechaCobroReal && v.fechaCobroCheque).reduce((s, v) => {
+    const facturado = ventasCobros.reduce((s, v) => s + parseArgMoney(v.montoFacturado), 0);
+    const ingresado = ventasCobros.filter(v => v.fechaCobroReal).reduce((s, v) => s + parseArgMoney(v.montoCobrado || v.montoFacturado), 0);
+    const proyectado = ventasCobros.filter(v => !v.fechaCobroReal && v.fechaCobroCheque).reduce((s, v) => {
       const retes = parseArgMoney(v.retGanancias) + parseArgMoney(v.retIIBB) + parseArgMoney(v.retSellados);
       return s + parseArgMoney(v.montoFacturado) - retes;
     }, 0);
-    const pendiente = filtered.filter(v => !v.fechaCobroReal && !v.fechaCobroCheque).reduce((s, v) => s + parseArgMoney(v.montoFacturado), 0);
+    const pendiente = ventasCobros.filter(v => !v.fechaCobroReal && !v.fechaCobroCheque).reduce((s, v) => s + parseArgMoney(v.montoFacturado), 0);
     const porIngresar = facturado - ingresado;
     return { facturado, ingresado, proyectado, pendiente, porIngresar };
-  }, [filtered]);
+  }, [ventasCobros]);
 
   const handleEdit = async (form) => {
     try {
@@ -146,13 +274,13 @@ export default function Cobranzas({ data, loading, refetch, addToast }) {
         : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 20 }}>
             <KPICard label="Facturado" value={formatARS(kpis.facturado)} icon={TrendingUp} color="#6B7280"
-              hint="Total emitido en facturas del período. Lo que se debería cobrar." />
+              hint="Total emitido en facturas. Lo que se debería cobrar." />
             <KPICard label="Ingresado" value={formatARS(kpis.ingresado)} icon={TrendingUp} color="#059669"
               hint="Dinero efectivamente recibido (con Fecha de cobro REAL cargada)." />
             <KPICard label="Proyectado (echeq)" value={formatARS(kpis.proyectado)} icon={CalendarClock} color="#1D4ED8"
-              hint="Cheques/echeq sin acreditar todavía, netos de retenciones. Se cobran en la fecha de acreditación." />
+              hint="Cheques/echeq sin acreditar todavía, netos de retenciones." />
             <KPICard label="Pendiente" value={formatARS(kpis.pendiente)} icon={Clock} color="#DC2626"
-              hint="Facturado sin cobro real ni cheque en circulación. Aún no entró nada." />
+              hint="Facturado sin cobro real ni cheque en circulación." />
           </div>
         )
       }
@@ -177,78 +305,21 @@ export default function Cobranzas({ data, loading, refetch, addToast }) {
         </div>
       )}
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <label style={{ fontSize: 13, color: '#6B7280', fontWeight: 500 }}>Mes:</label>
-          <select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}
-            style={{ padding: '6px 10px', border: '1px solid #E5E7EB', borderRadius: 6, fontSize: 13, fontFamily: 'inherit', background: '#fff' }}>
-            <option value="">Todos</option>
-            {allMonths.map(m => <option key={m} value={m}>{format(parseISO(m + '-01'), 'MMM yyyy', { locale: es })}</option>)}
-          </select>
-        </div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: 14 }}>
         <button onClick={() => setShowModal(true)}
           style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', background: '#C05621', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
           <Plus size={14} /> Registrar cobro
         </button>
       </div>
 
-      <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, overflow: 'hidden' }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead>
-              <tr style={{ background: '#F9FAFB', borderBottom: '1px solid #E5E7EB' }}>
-                {['Paciente', 'Obra Social', 'N° Factura', 'Facturado', 'Ret.', 'Neto cobrado', 'Medio Pago', 'F. Esperada', 'F. Real / Echeq', 'Mora', 'Estado', ''].map(h => (
-                  <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: '#9CA3AF', fontSize: 11, whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {loading
-                ? <tr><td colSpan={12}><SkeletonTable rows={6} cols={12} /></td></tr>
-                : filtered.map((v, i) => {
-                    const estado = getEstado(v);
-                    const retes = parseArgMoney(v.retGanancias) + parseArgMoney(v.retIIBB) + parseArgMoney(v.retSellados);
-                    const neto = parseArgMoney(v.montoFacturado) - retes;
-                    const mora = v.fechaCobroReal ? null : daysDiff(parseDate(v.fechaCobroEsperada));
-                    const fechaDisplay = v.fechaCobroReal ? v.fechaCobroReal : v.fechaCobroCheque ? `echeq ${v.fechaCobroCheque}` : '—';
-                    return (
-                      <tr key={i} style={{ borderBottom: '1px solid #F3F4F6', background: getRowBg(estado) }}>
-                        <td style={{ padding: '9px 12px', fontWeight: 500 }}>{toTitleCase(v.paciente)}</td>
-                        <td style={{ padding: '9px 12px', color: '#374151' }}>{toTitleCase(v.obraSocial)}</td>
-                        <td style={{ padding: '9px 12px', fontVariantNumeric: 'tabular-nums', fontSize: 12 }}>{v.nroFactura}</td>
-                        <td style={{ padding: '9px 12px', fontVariantNumeric: 'tabular-nums', fontSize: 12 }}>{formatARS(parseArgMoney(v.montoFacturado))}</td>
-                        <td style={{ padding: '9px 12px', fontVariantNumeric: 'tabular-nums', fontSize: 12, color: retes > 0 ? '#B91C1C' : '#9CA3AF' }}>{retes > 0 ? `- ${formatARS(retes)}` : '—'}</td>
-                        <td style={{ padding: '9px 12px', fontVariantNumeric: 'tabular-nums', fontSize: 12, fontWeight: 600, color: estado === 'cobrado' ? '#059669' : estado === 'proyectado' ? '#1D4ED8' : '#111827' }}>{formatARS(neto)}</td>
-                        <td style={{ padding: '9px 12px', color: '#6B7280' }}>{toTitleCase(v.medioPago)}</td>
-                        <td style={{ padding: '9px 12px', color: '#9CA3AF', whiteSpace: 'nowrap', fontSize: 12 }}>{v.fechaCobroEsperada || '—'}</td>
-                        <td style={{ padding: '9px 12px', color: estado === 'cobrado' ? '#059669' : '#1D4ED8', whiteSpace: 'nowrap', fontSize: 12 }}>{fechaDisplay}</td>
-                        <td style={{ padding: '9px 12px', fontVariantNumeric: 'tabular-nums', fontSize: 12, color: mora > 0 ? '#DC2626' : '#9CA3AF' }}>
-                          {mora !== null ? (mora > 0 ? `+${mora}d` : mora < 0 ? `${Math.abs(mora)}d` : 'Hoy') : '—'}
-                        </td>
-                        <td style={{ padding: '9px 12px' }}>
-                          {estado === 'cobrado' && <Badge type="cobrado">Cobrado</Badge>}
-                          {estado === 'proyectado' && <Badge type="proyectado">Echeq</Badge>}
-                          {estado === 'vencido' && <Badge type="vencido">Vencido</Badge>}
-                          {estado === 'porVencer' && <Badge type="porVencer">Por vencer</Badge>}
-                          {estado === 'pendiente' && <Badge type="pendiente">Pendiente</Badge>}
-                        </td>
-                        <td style={{ padding: '9px 12px' }}>
-                          <button onClick={() => setEditing(v)}
-                            style={{ padding: '4px 8px', background: 'none', border: '1px solid #E5E7EB', borderRadius: 5, cursor: 'pointer', color: '#6B7280', display: 'flex', alignItems: 'center', gap: 3 }}>
-                            <Pencil size={12} /> <span style={{ fontSize: 11 }}>Editar</span>
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })
-              }
-              {!loading && filtered.length === 0 && (
-                <tr><td colSpan={12} style={{ padding: 40, textAlign: 'center', color: '#9CA3AF' }}>Sin datos</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {loading
+        ? <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 24 }}><SkeletonTable rows={6} cols={8} /></div>
+        : grouped.length === 0
+          ? <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 40, textAlign: 'center', color: '#9CA3AF' }}>Sin datos</div>
+          : grouped.map(({ ym, rows }) => (
+              <MonthGroup key={ym} yyyymm={ym} rows={rows} defaultOpen={ym === currentYM} onEdit={setEditing} />
+            ))
+      }
 
       {showModal && (
         <CobroForm

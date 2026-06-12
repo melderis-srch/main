@@ -6,7 +6,7 @@ import {
 } from 'recharts';
 import { SkeletonKPI, Skeleton } from '../components/UI/Skeleton';
 import { parseArgMoney, formatARS, parseDate, daysDiff, toTitleCase } from '../utils/formatters';
-import { TrendingUp, TrendingDown } from 'lucide-react';
+import { TrendingUp, TrendingDown, ChevronDown, ChevronRight } from 'lucide-react';
 import { format, parseISO, subMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -216,7 +216,11 @@ function pctDelta(curr, prev) {
 /* ── componente principal ────────────────────────────────── */
 export default function Dashboard({ data, loading }) {
   const { ventasCobros, gastosPagos } = data;
-  const [selectedMonth, setSelectedMonth] = useState(format(new Date(),'yyyy-MM'));
+  const currentYM = format(new Date(), 'yyyy-MM');
+  const [selectedMonth, setSelectedMonth] = useState(currentYM);
+  const isCurrentMonth = !selectedMonth || selectedMonth === currentYM;
+  const [openDeudaOS, setOpenDeudaOS] = useState(true);
+  const [openDeudaProv, setOpenDeudaProv] = useState(true);
 
   const allMonths = useMemo(() => {
     const s = new Set();
@@ -413,11 +417,23 @@ export default function Dashboard({ data, loading }) {
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20 }}>
 
         <Card>
-          <CardHeader
-            left="Cobros pendientes por obra social"
-            right={formatARS(deudaOS.reduce((s,o)=>s+o.monto,0))}
-          />
-          {deudaOS.length === 0
+          <div
+            onClick={() => setOpenDeudaOS(o => !o)}
+            style={{ padding:'13px 20px', borderBottom: openDeudaOS ? '1px solid #F3F4F6' : 'none',
+              display:'flex', justifyContent:'space-between', alignItems:'center',
+              background:'#FAFAFA', cursor:'pointer' }}
+          >
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              {openDeudaOS ? <ChevronDown size={14} color="#9CA3AF"/> : <ChevronRight size={14} color="#9CA3AF"/>}
+              <span style={{ fontSize:12, fontWeight:700, color:'#374151', textTransform:'uppercase', letterSpacing:'0.06em' }}>
+                Cobros pendientes por obra social
+              </span>
+            </div>
+            <span style={{ fontSize:13, fontVariantNumeric:'tabular-nums', fontWeight:700, color:RED }}>
+              {formatARS(deudaOS.reduce((s,o)=>s+o.monto,0))}
+            </span>
+          </div>
+          {openDeudaOS && (deudaOS.length === 0
             ? <div style={{ padding:32, textAlign:'center', color:'#9CA3AF', fontSize:13 }}>Sin cobros pendientes</div>
             : (
               <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
@@ -444,15 +460,27 @@ export default function Dashboard({ data, loading }) {
                 </tbody>
               </table>
             )
-          }
+          )}
         </Card>
 
         <Card>
-          <CardHeader
-            left="Deuda a proveedores"
-            right={formatARS(deudaProveedores.reduce((s,p)=>s+p.monto,0))}
-          />
-          {deudaProveedores.length === 0
+          <div
+            onClick={() => setOpenDeudaProv(o => !o)}
+            style={{ padding:'13px 20px', borderBottom: openDeudaProv ? '1px solid #F3F4F6' : 'none',
+              display:'flex', justifyContent:'space-between', alignItems:'center',
+              background:'#FAFAFA', cursor:'pointer' }}
+          >
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              {openDeudaProv ? <ChevronDown size={14} color="#9CA3AF"/> : <ChevronRight size={14} color="#9CA3AF"/>}
+              <span style={{ fontSize:12, fontWeight:700, color:'#374151', textTransform:'uppercase', letterSpacing:'0.06em' }}>
+                Deuda a proveedores
+              </span>
+            </div>
+            <span style={{ fontSize:13, fontVariantNumeric:'tabular-nums', fontWeight:700, color:AMBER }}>
+              {formatARS(deudaProveedores.reduce((s,p)=>s+p.monto,0))}
+            </span>
+          </div>
+          {openDeudaProv && (deudaProveedores.length === 0
             ? <div style={{ padding:32, textAlign:'center', color:'#9CA3AF', fontSize:13 }}>Sin deuda pendiente</div>
             : (
               <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
@@ -479,7 +507,7 @@ export default function Dashboard({ data, loading }) {
                 </tbody>
               </table>
             )
-          }
+          )}
         </Card>
       </div>
     </div>
