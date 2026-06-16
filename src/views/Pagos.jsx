@@ -179,7 +179,7 @@ function CatGroup({ categoria, rows, onEdit }) {
       </div>
 
       {open && (
-        <div style={{ overflowX: 'auto' }}>
+        <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 480 }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ background: '#F9FAFB' }}>
