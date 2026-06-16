@@ -2,7 +2,7 @@
 import { useState, useMemo } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Plus, Pencil, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, Pencil, ChevronDown, ChevronRight, Package, Wrench } from 'lucide-react';
 import { Badge } from '../components/UI/Badge';
 import { Modal } from '../components/UI/Modal';
 import { KPICard } from '../components/UI/KPICard';
@@ -10,6 +10,20 @@ import { SkeletonTable, SkeletonKPI } from '../components/UI/Skeleton';
 import { parseArgMoney, formatARS, parseDate, formatDate, toTitleCase } from '../utils/formatters';
 import { gasClient } from '../utils/gasClient';
 import { Receipt, CreditCard, AlertCircle, CalendarClock } from 'lucide-react';
+
+// All known providers — used for autocomplete
+const PROVEEDORES_LIST = [
+  'NOVAX', 'BIOLAP', 'BIOMEDICI', 'CROSMED', 'CARDIO SEREL', 'IMPLANTES CMP',
+  'IPMAGNA', 'BIOTROM', 'IDEAR', 'SDK MEDICAL', 'SB INSUMOS', 'PROMEDON',
+  'ORLOSH', 'KINETICAL', 'BONEBRIDGE', 'IMNOVA', 'SWISS PROTECH',
+  'SURGICAL SUPPLY', 'MEDICAL ELEMENT', 'ORTOPEDIA ESCOBAR',
+  'DROG MONUMENTO', 'LAB SL', 'LABORATORIO BIOXEN', 'LABORATORIO CELINA',
+  'RIO SERVICIOS',
+];
+
+// Rows with categoria === 'Implantes' go to the implants section grouped by emisor.
+// All other rows go to the "Otros gastos" section grouped by categoria.
+const isImplante = (g) => (g.categoria || '').trim().toLowerCase() === 'implantes';
 
 function getEstadoGasto(g) {
   if (g.pagado || g.saldado) return 'pagado';
@@ -26,7 +40,7 @@ function rowBg(estado) {
 const FIELDS_GASTO = [
   { k: 'fechaEmision', label: 'Fecha Emisión', placeholder: 'dd/mm/yyyy' },
   { k: 'nroFactura', label: 'N° Factura' },
-  { k: 'emisor', label: 'Emisor / Proveedor' },
+  { k: 'emisor', label: 'Emisor / Proveedor', listId: 'proveedores-list' },
   { k: 'monto', label: 'Monto' },
   { k: 'categoria', label: 'Categoría' },
   { k: 'formaPago', label: 'Forma de Pago' },
@@ -47,13 +61,21 @@ function GastoForm({ initial, title, saveLabel, onSubmit, onClose, showPagado })
 
   return (
     <Modal open onClose={onClose} width={620} title={<span style={{ fontSize: 16, fontWeight: 700 }}>{title}</span>}>
+      <datalist id="proveedores-list">
+        {PROVEEDORES_LIST.map(p => <option key={p} value={p} />)}
+      </datalist>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          {FIELDS_GASTO.map(({ k, label, placeholder }) => (
+          {FIELDS_GASTO.map(({ k, label, placeholder, listId }) => (
             <div key={k}>
               <label style={{ fontSize: 12, color: '#6B7280', fontWeight: 500, display: 'block', marginBottom: 4 }}>{label}</label>
-              <input value={form[k] || ''} onChange={e => set(k, e.target.value)} placeholder={placeholder || ''}
-                style={{ width: '100%', padding: '7px 10px', border: '1px solid #E5E7EB', borderRadius: 6, fontSize: 13, fontFamily: 'inherit', boxSizing: 'border-box' }} />
+              <input
+                value={form[k] || ''}
+                onChange={e => set(k, e.target.value)}
+                placeholder={placeholder || ''}
+                list={listId}
+                style={{ width: '100%', padding: '7px 10px', border: '1px solid #E5E7EB', borderRadius: 6, fontSize: 13, fontFamily: 'inherit', boxSizing: 'border-box' }}
+              />
             </div>
           ))}
         </div>
@@ -149,6 +171,32 @@ function GastoRow({ g, onEdit }) {
   );
 }
 
+// Shared table structure (no overflow wrapper — sticky works relative to page)
+const TABLE_HEADERS = ['Proveedor', 'N° Factura', 'Fecha', 'Monto', 'Descripción', 'Estado'];
+const TH_STYLE = {
+  padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: '#9CA3AF', fontSize: 11,
+  whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.04em',
+  position: 'sticky', top: 60, background: '#F9FAFB', zIndex: 10,
+  borderBottom: '1px solid #E5E7EB',
+};
+
+function GrupoTable({ rows, onEdit }) {
+  return (
+    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+      <thead>
+        <tr style={{ background: '#F9FAFB' }}>
+          <th style={{ width: 28, ...TH_STYLE }} />
+          {TABLE_HEADERS.map(h => <th key={h} style={TH_STYLE}>{h}</th>)}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((g, i) => <GastoRow key={i} g={g} onEdit={onEdit} />)}
+      </tbody>
+    </table>
+  );
+}
+
+// Group card for OTHER expenses (by category)
 function CatGroup({ categoria, rows, onEdit }) {
   const [open, setOpen] = useState(true);
 
@@ -160,7 +208,7 @@ function CatGroup({ categoria, rows, onEdit }) {
     <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, marginBottom: 10 }}>
       <div
         onClick={() => setOpen(o => !o)}
-        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', cursor: 'pointer', borderBottom: open ? '1px solid #F3F4F6' : 'none', background: open ? '#FAFAFA' : '#fff' }}
+        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', cursor: 'pointer', borderBottom: open ? '1px solid #F3F4F6' : 'none', background: open ? '#FAFAFA' : '#fff', borderRadius: open ? '10px 10px 0 0' : 10 }}
       >
         {open ? <ChevronDown size={15} color="#9CA3AF" /> : <ChevronRight size={15} color="#9CA3AF" />}
         <span style={{ fontSize: 14, fontWeight: 700, color: '#111827', minWidth: 160 }}>{toTitleCase(categoria) || 'Sin categoría'}</span>
@@ -177,24 +225,54 @@ function CatGroup({ categoria, rows, onEdit }) {
           <span style={{ fontSize: 14, fontWeight: 700, color: '#D97706', fontVariantNumeric: 'tabular-nums' }}>{formatARS(pendiente)}</span>
         </>}
       </div>
+      {open && <GrupoTable rows={rows} onEdit={onEdit} />}
+    </div>
+  );
+}
 
-      {open && (
-        <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 480 }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-          <thead>
-            <tr style={{ background: '#F9FAFB' }}>
-              <th style={{ width: 28, position: 'sticky', top: 0, background: '#F9FAFB', zIndex: 1 }} />
-              {['Proveedor', 'N° Factura', 'Fecha', 'Monto', 'Descripción', 'Estado'].map(h => (
-                <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: '#9CA3AF', fontSize: 11, whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, background: '#F9FAFB', zIndex: 1, borderBottom: '1px solid #E5E7EB' }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((g, i) => <GastoRow key={i} g={g} onEdit={onEdit} />)}
-          </tbody>
-        </table>
-        </div>
-      )}
+// Group card for IMPLANTES (by provider/emisor)
+function ProveedorGroup({ emisor, rows, onEdit }) {
+  const [open, setOpen] = useState(true);
+
+  const total = rows.reduce((s, g) => s + parseArgMoney(g.monto), 0);
+  const pagado = rows.filter(g => g.pagado || g.saldado).reduce((s, g) => s + parseArgMoney(g.monto), 0);
+  const pendiente = rows.filter(g => !g.pagado && !g.saldado && !g.fechaPagoEcheq).reduce((s, g) => s + parseArgMoney(g.monto), 0);
+
+  return (
+    <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, marginBottom: 10 }}>
+      <div
+        onClick={() => setOpen(o => !o)}
+        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', cursor: 'pointer', borderBottom: open ? '1px solid #F3F4F6' : 'none', background: open ? '#FAFAFA' : '#fff', borderRadius: open ? '10px 10px 0 0' : 10 }}
+      >
+        {open ? <ChevronDown size={15} color="#9CA3AF" /> : <ChevronRight size={15} color="#9CA3AF" />}
+        <span style={{ fontSize: 14, fontWeight: 700, color: '#111827', minWidth: 160 }}>{toTitleCase(emisor) || 'Sin proveedor'}</span>
+        <span style={{ fontSize: 12, color: '#9CA3AF' }}>{rows.length} {rows.length === 1 ? 'factura' : 'facturas'}</span>
+        <div style={{ flex: 1 }} />
+        <span style={{ fontSize: 12, color: '#6B7280', marginRight: 6 }}>Total:</span>
+        <span style={{ fontSize: 14, fontWeight: 700, color: '#111827', fontVariantNumeric: 'tabular-nums', marginRight: 20 }}>{formatARS(total)}</span>
+        {pagado > 0 && <>
+          <span style={{ fontSize: 12, color: '#6B7280', marginRight: 6 }}>Pagado:</span>
+          <span style={{ fontSize: 14, fontWeight: 700, color: '#059669', fontVariantNumeric: 'tabular-nums', marginRight: 20 }}>{formatARS(pagado)}</span>
+        </>}
+        {pendiente > 0 && <>
+          <span style={{ fontSize: 12, color: '#6B7280', marginRight: 6 }}>Pendiente:</span>
+          <span style={{ fontSize: 14, fontWeight: 700, color: '#D97706', fontVariantNumeric: 'tabular-nums' }}>{formatARS(pendiente)}</span>
+        </>}
+      </div>
+      {open && <GrupoTable rows={rows} onEdit={onEdit} />}
+    </div>
+  );
+}
+
+// Section banner (Implantes / Otros gastos)
+function SectionHeader({ icon: Icon, label, total, color, count }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, marginTop: 20, paddingBottom: 8, borderBottom: `2px solid ${color}` }}>
+      <Icon size={16} color={color} />
+      <span style={{ fontSize: 13, fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</span>
+      <span style={{ fontSize: 12, color: '#9CA3AF' }}>{count} {count === 1 ? 'registro' : 'registros'}</span>
+      <div style={{ flex: 1 }} />
+      <span style={{ fontSize: 15, fontWeight: 700, color: '#111827', fontVariantNumeric: 'tabular-nums' }}>{formatARS(total)}</span>
     </div>
   );
 }
@@ -222,9 +300,21 @@ export default function Pagos({ data, loading, refetch, addToast }) {
     });
   }, [gastosPagos, selectedMonth]);
 
-  const grouped = useMemo(() => {
+  // Implantes section — grouped by emisor
+  const implantesGroups = useMemo(() => {
     const map = {};
-    filtered.forEach(g => {
+    filtered.filter(isImplante).forEach(g => {
+      const key = (g.emisor || '').trim().toUpperCase() || 'SIN PROVEEDOR';
+      if (!map[key]) map[key] = [];
+      map[key].push(g);
+    });
+    return Object.keys(map).sort().map(k => ({ emisor: k, rows: map[k] }));
+  }, [filtered]);
+
+  // Otros gastos section — grouped by categoria (excluding implantes rows)
+  const otrosGroups = useMemo(() => {
+    const map = {};
+    filtered.filter(g => !isImplante(g)).forEach(g => {
       const cat = (g.categoria || '').trim() || 'Sin categoría';
       if (!map[cat]) map[cat] = [];
       map[cat].push(g);
@@ -239,6 +329,11 @@ export default function Pagos({ data, loading, refetch, addToast }) {
     const pendiente = filtered.filter(g => !g.pagado && !g.saldado && !g.fechaPagoEcheq).reduce((s, g) => s + parseArgMoney(g.monto), 0);
     return { total, pagado, proyectado, pendiente };
   }, [filtered]);
+
+  const totalImplantes = useMemo(() =>
+    filtered.filter(isImplante).reduce((s, g) => s + parseArgMoney(g.monto), 0), [filtered]);
+  const totalOtros = useMemo(() =>
+    filtered.filter(g => !isImplante(g)).reduce((s, g) => s + parseArgMoney(g.monto), 0), [filtered]);
 
   const handleEdit = async (form) => {
     try {
@@ -259,6 +354,8 @@ export default function Pagos({ data, loading, refetch, addToast }) {
     } catch (e) { addToast('Error: ' + e.message, 'error'); }
   };
 
+  const hasData = implantesGroups.length > 0 || otrosGroups.length > 0;
+
   return (
     <div>
       {loading
@@ -266,7 +363,7 @@ export default function Pagos({ data, loading, refetch, addToast }) {
         : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 20 }}>
             <KPICard label="Total gastos" value={formatARS(kpis.total)} icon={Receipt} color="#6B7280"
-              hint="Suma de todas las facturas de gastos del período, pagadas o no." />
+              hint="Suma de todas las facturas del período, pagadas o no." />
             <KPICard label="Pagado" value={formatARS(kpis.pagado)} icon={CreditCard} color="#059669"
               hint="Gastos ya cancelados (marcados como pagados o con echeq saldado/debitado)." />
             <KPICard label="Proyectado (echeq)" value={formatARS(kpis.proyectado)} icon={CalendarClock} color="#1D4ED8"
@@ -296,18 +393,30 @@ export default function Pagos({ data, loading, refetch, addToast }) {
           })}
         </div>
         <button onClick={() => setShowModal(true)}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', background: '#C05621', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
+          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', background: '#C05621', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', flexShrink: 0 }}>
           <Plus size={14} /> Registrar gasto
         </button>
       </div>
 
       {loading
         ? <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 24 }}><SkeletonTable rows={6} cols={7} /></div>
-        : grouped.length === 0
+        : !hasData
           ? <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 40, textAlign: 'center', color: '#9CA3AF' }}>Sin gastos para el período seleccionado</div>
-          : grouped.map(({ categoria, rows }) => (
-              <CatGroup key={categoria} categoria={categoria} rows={rows} onEdit={setEditing} />
-            ))
+          : <>
+              {implantesGroups.length > 0 && <>
+                <SectionHeader icon={Package} label="Implantes" total={totalImplantes} color="#0891B2" count={filtered.filter(isImplante).length} />
+                {implantesGroups.map(({ emisor, rows }) => (
+                  <ProveedorGroup key={emisor} emisor={emisor} rows={rows} onEdit={setEditing} />
+                ))}
+              </>}
+
+              {otrosGroups.length > 0 && <>
+                <SectionHeader icon={Wrench} label="Otros gastos" total={totalOtros} color="#6B7280" count={filtered.filter(g => !isImplante(g)).length} />
+                {otrosGroups.map(({ categoria, rows }) => (
+                  <CatGroup key={categoria} categoria={categoria} rows={rows} onEdit={setEditing} />
+                ))}
+              </>}
+            </>
       }
 
       {showModal && (
