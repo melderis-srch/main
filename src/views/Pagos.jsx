@@ -329,8 +329,11 @@ export default function Pagos({ data, loading, refetch, addToast }) {
   const allMonths = useMemo(() => {
     const set = new Set();
     gastosPagos.forEach(g => {
-      const d = parseDate(g.fechaEmision);
-      if (d) set.add(format(d, 'yyyy-MM'));
+      // Include month from fechaPago (for paid items) and fechaEmision (for pending)
+      [g.fechaPago, g.fechaEmision].forEach(ds => {
+        const d = parseDate(ds);
+        if (d) set.add(format(d, 'yyyy-MM'));
+      });
     });
     return Array.from(set).sort().reverse();
   }, [gastosPagos]);
@@ -338,7 +341,11 @@ export default function Pagos({ data, loading, refetch, addToast }) {
   const filtered = useMemo(() => {
     if (selectedMonth === 'all') return gastosPagos;
     return gastosPagos.filter(g => {
-      const d = parseDate(g.fechaEmision);
+      const isPaid = g.pagado || g.saldado;
+      // Paid items: filter by when they were actually paid
+      // Pending/projected: filter by invoice emission date
+      const dateStr = isPaid ? g.fechaPago : g.fechaEmision;
+      const d = parseDate(dateStr);
       return d && format(d, 'yyyy-MM') === selectedMonth;
     });
   }, [gastosPagos, selectedMonth]);
