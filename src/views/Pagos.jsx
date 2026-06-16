@@ -2,7 +2,7 @@
 import { useState, useMemo } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Plus, Pencil, ChevronDown, ChevronRight, Package, Wrench } from 'lucide-react';
+import { Plus, Pencil, ChevronDown, ChevronRight } from 'lucide-react';
 import { Badge } from '../components/UI/Badge';
 import { Modal } from '../components/UI/Modal';
 import { KPICard } from '../components/UI/KPICard';
@@ -264,24 +264,40 @@ function ProveedorGroup({ emisor, rows, onEdit }) {
   );
 }
 
-// Section banner (Implantes / Otros gastos)
-function SectionHeader({ icon: Icon, label, total, color, count }) {
+// Tab subtotal banner
+function TabBanner({ total, pagado, pendiente, count }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, marginTop: 20, paddingBottom: 8, borderBottom: `2px solid ${color}` }}>
-      <Icon size={16} color={color} />
-      <span style={{ fontSize: 13, fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</span>
-      <span style={{ fontSize: 12, color: '#9CA3AF' }}>{count} {count === 1 ? 'registro' : 'registros'}</span>
-      <div style={{ flex: 1 }} />
-      <span style={{ fontSize: 15, fontWeight: 700, color: '#111827', fontVariantNumeric: 'tabular-nums' }}>{formatARS(total)}</span>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 20, padding: '10px 16px', background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: 8, marginBottom: 14 }}>
+      <div>
+        <div style={{ fontSize: 11, color: '#9CA3AF', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 2 }}>Total período</div>
+        <div style={{ fontSize: 16, fontWeight: 700, color: '#111827', fontVariantNumeric: 'tabular-nums' }}>{formatARS(total)}</div>
+      </div>
+      {pagado > 0 && <div>
+        <div style={{ fontSize: 11, color: '#9CA3AF', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 2 }}>Pagado</div>
+        <div style={{ fontSize: 16, fontWeight: 700, color: '#059669', fontVariantNumeric: 'tabular-nums' }}>{formatARS(pagado)}</div>
+      </div>}
+      {pendiente > 0 && <div>
+        <div style={{ fontSize: 11, color: '#9CA3AF', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 2 }}>Pendiente</div>
+        <div style={{ fontSize: 16, fontWeight: 700, color: '#D97706', fontVariantNumeric: 'tabular-nums' }}>{formatARS(pendiente)}</div>
+      </div>}
+      <div style={{ marginLeft: 'auto' }}>
+        <span style={{ fontSize: 12, color: '#9CA3AF' }}>{count} {count === 1 ? 'registro' : 'registros'}</span>
+      </div>
     </div>
   );
 }
+
+const TABS = [
+  { id: 'implantes', label: 'Implantes' },
+  { id: 'gastos', label: 'Gastos varios' },
+];
 
 export default function Pagos({ data, loading, refetch, addToast }) {
   const { gastosPagos } = data;
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [selectedMonth, setSelectedMonth] = useState(() => format(new Date(), 'yyyy-MM'));
+  const [activeTab, setActiveTab] = useState('implantes');
 
   const allMonths = useMemo(() => {
     const set = new Set();
@@ -330,10 +346,17 @@ export default function Pagos({ data, loading, refetch, addToast }) {
     return { total, pagado, proyectado, pendiente };
   }, [filtered]);
 
-  const totalImplantes = useMemo(() =>
-    filtered.filter(isImplante).reduce((s, g) => s + parseArgMoney(g.monto), 0), [filtered]);
-  const totalOtros = useMemo(() =>
-    filtered.filter(g => !isImplante(g)).reduce((s, g) => s + parseArgMoney(g.monto), 0), [filtered]);
+  const tabKpis = useMemo(() => {
+    const calc = (rows) => ({
+      total: rows.reduce((s, g) => s + parseArgMoney(g.monto), 0),
+      pagado: rows.filter(g => g.pagado || g.saldado).reduce((s, g) => s + parseArgMoney(g.monto), 0),
+      pendiente: rows.filter(g => !g.pagado && !g.saldado && !g.fechaPagoEcheq).reduce((s, g) => s + parseArgMoney(g.monto), 0),
+    });
+    return {
+      implantes: calc(filtered.filter(isImplante)),
+      gastos: calc(filtered.filter(g => !isImplante(g))),
+    };
+  }, [filtered]);
 
   const handleEdit = async (form) => {
     try {
@@ -354,8 +377,6 @@ export default function Pagos({ data, loading, refetch, addToast }) {
     } catch (e) { addToast('Error: ' + e.message, 'error'); }
   };
 
-  const hasData = implantesGroups.length > 0 || otrosGroups.length > 0;
-
   return (
     <div>
       {loading
@@ -374,10 +395,21 @@ export default function Pagos({ data, loading, refetch, addToast }) {
         )
       }
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+      {/* Tabs + month filter row */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
+        {/* Tabs */}
+        <div style={{ display: 'flex', gap: 2, background: '#F3F4F6', borderRadius: 8, padding: 3 }}>
+          {TABS.map(t => (
+            <button key={t.id} onClick={() => setActiveTab(t.id)}
+              style={{ padding: '6px 16px', borderRadius: 6, border: 'none', background: activeTab === t.id ? '#fff' : 'transparent', color: activeTab === t.id ? '#111827' : '#6B7280', fontWeight: activeTab === t.id ? 700 : 400, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', boxShadow: activeTab === t.id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.15s' }}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Month filter + button */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-          <button
-            onClick={() => setSelectedMonth('all')}
+          <button onClick={() => setSelectedMonth('all')}
             style={{ padding: '5px 12px', borderRadius: 6, border: selectedMonth === 'all' ? '1.5px solid #C05621' : '1px solid #E5E7EB', background: selectedMonth === 'all' ? '#FFF7ED' : '#fff', color: selectedMonth === 'all' ? '#C05621' : '#374151', fontWeight: selectedMonth === 'all' ? 700 : 400, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
             Todo
           </button>
@@ -391,32 +423,32 @@ export default function Pagos({ data, loading, refetch, addToast }) {
               </button>
             );
           })}
+          <button onClick={() => setShowModal(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', background: '#C05621', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', flexShrink: 0 }}>
+            <Plus size={14} /> Registrar gasto
+          </button>
         </div>
-        <button onClick={() => setShowModal(true)}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', background: '#C05621', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', flexShrink: 0 }}>
-          <Plus size={14} /> Registrar gasto
-        </button>
       </div>
 
       {loading
         ? <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 24 }}><SkeletonTable rows={6} cols={7} /></div>
-        : !hasData
-          ? <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 40, textAlign: 'center', color: '#9CA3AF' }}>Sin gastos para el período seleccionado</div>
-          : <>
-              {implantesGroups.length > 0 && <>
-                <SectionHeader icon={Package} label="Implantes" total={totalImplantes} color="#0891B2" count={filtered.filter(isImplante).length} />
+        : activeTab === 'implantes'
+          ? implantesGroups.length === 0
+            ? <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 40, textAlign: 'center', color: '#9CA3AF' }}>Sin implantes en este período</div>
+            : <>
+                <TabBanner {...tabKpis.implantes} count={filtered.filter(isImplante).length} />
                 {implantesGroups.map(({ emisor, rows }) => (
                   <ProveedorGroup key={emisor} emisor={emisor} rows={rows} onEdit={setEditing} />
                 ))}
-              </>}
-
-              {otrosGroups.length > 0 && <>
-                <SectionHeader icon={Wrench} label="Otros gastos" total={totalOtros} color="#6B7280" count={filtered.filter(g => !isImplante(g)).length} />
+              </>
+          : otrosGroups.length === 0
+            ? <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 40, textAlign: 'center', color: '#9CA3AF' }}>Sin gastos en este período</div>
+            : <>
+                <TabBanner {...tabKpis.gastos} count={filtered.filter(g => !isImplante(g)).length} />
                 {otrosGroups.map(({ categoria, rows }) => (
                   <CatGroup key={categoria} categoria={categoria} rows={rows} onEdit={setEditing} />
                 ))}
-              </>}
-            </>
+              </>
       }
 
       {showModal && (
