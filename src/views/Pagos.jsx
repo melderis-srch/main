@@ -1,5 +1,7 @@
 'use client';
 import { useState, useMemo } from 'react';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { Plus, Pencil, ChevronDown, ChevronRight } from 'lucide-react';
 import { Badge } from '../components/UI/Badge';
 import { Modal } from '../components/UI/Modal';
@@ -155,7 +157,7 @@ function CatGroup({ categoria, rows, onEdit }) {
   const pendiente = rows.filter(g => !g.pagado && !g.saldado && !g.fechaPagoEcheq).reduce((s, g) => s + parseArgMoney(g.monto), 0);
 
   return (
-    <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, overflow: 'hidden', marginBottom: 10 }}>
+    <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, marginBottom: 10 }}>
       <div
         onClick={() => setOpen(o => !o)}
         style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', cursor: 'pointer', borderBottom: open ? '1px solid #F3F4F6' : 'none', background: open ? '#FAFAFA' : '#fff' }}
@@ -177,7 +179,7 @@ function CatGroup({ categoria, rows, onEdit }) {
       </div>
 
       {open && (
-        <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 480 }}>
+        <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ background: '#F9FAFB' }}>
@@ -201,24 +203,42 @@ export default function Pagos({ data, loading, refetch, addToast }) {
   const { gastosPagos } = data;
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [selectedMonth, setSelectedMonth] = useState(() => format(new Date(), 'yyyy-MM'));
+
+  const allMonths = useMemo(() => {
+    const set = new Set();
+    gastosPagos.forEach(g => {
+      const d = parseDate(g.fechaEmision);
+      if (d) set.add(format(d, 'yyyy-MM'));
+    });
+    return Array.from(set).sort().reverse();
+  }, [gastosPagos]);
+
+  const filtered = useMemo(() => {
+    if (selectedMonth === 'all') return gastosPagos;
+    return gastosPagos.filter(g => {
+      const d = parseDate(g.fechaEmision);
+      return d && format(d, 'yyyy-MM') === selectedMonth;
+    });
+  }, [gastosPagos, selectedMonth]);
 
   const grouped = useMemo(() => {
     const map = {};
-    gastosPagos.forEach(g => {
+    filtered.forEach(g => {
       const cat = (g.categoria || '').trim() || 'Sin categoría';
       if (!map[cat]) map[cat] = [];
       map[cat].push(g);
     });
     return Object.keys(map).sort().map(k => ({ categoria: k, rows: map[k] }));
-  }, [gastosPagos]);
+  }, [filtered]);
 
   const kpis = useMemo(() => {
-    const total = gastosPagos.reduce((s, g) => s + parseArgMoney(g.monto), 0);
-    const pagado = gastosPagos.filter(g => g.pagado || g.saldado).reduce((s, g) => s + parseArgMoney(g.monto), 0);
-    const proyectado = gastosPagos.filter(g => !g.pagado && !g.saldado && g.fechaPagoEcheq).reduce((s, g) => s + parseArgMoney(g.monto), 0);
-    const pendiente = gastosPagos.filter(g => !g.pagado && !g.saldado && !g.fechaPagoEcheq).reduce((s, g) => s + parseArgMoney(g.monto), 0);
+    const total = filtered.reduce((s, g) => s + parseArgMoney(g.monto), 0);
+    const pagado = filtered.filter(g => g.pagado || g.saldado).reduce((s, g) => s + parseArgMoney(g.monto), 0);
+    const proyectado = filtered.filter(g => !g.pagado && !g.saldado && g.fechaPagoEcheq).reduce((s, g) => s + parseArgMoney(g.monto), 0);
+    const pendiente = filtered.filter(g => !g.pagado && !g.saldado && !g.fechaPagoEcheq).reduce((s, g) => s + parseArgMoney(g.monto), 0);
     return { total, pagado, proyectado, pendiente };
-  }, [gastosPagos]);
+  }, [filtered]);
 
   const handleEdit = async (form) => {
     try {
@@ -257,7 +277,24 @@ export default function Pagos({ data, loading, refetch, addToast }) {
         )
       }
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          <button
+            onClick={() => setSelectedMonth('all')}
+            style={{ padding: '5px 12px', borderRadius: 6, border: selectedMonth === 'all' ? '1.5px solid #C05621' : '1px solid #E5E7EB', background: selectedMonth === 'all' ? '#FFF7ED' : '#fff', color: selectedMonth === 'all' ? '#C05621' : '#374151', fontWeight: selectedMonth === 'all' ? 700 : 400, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
+            Todo
+          </button>
+          {allMonths.map(m => {
+            const label = format(new Date(m + '-02'), 'MMM yyyy', { locale: es });
+            const active = selectedMonth === m;
+            return (
+              <button key={m} onClick={() => setSelectedMonth(m)}
+                style={{ padding: '5px 12px', borderRadius: 6, border: active ? '1.5px solid #C05621' : '1px solid #E5E7EB', background: active ? '#FFF7ED' : '#fff', color: active ? '#C05621' : '#374151', fontWeight: active ? 700 : 400, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', textTransform: 'capitalize' }}>
+                {label}
+              </button>
+            );
+          })}
+        </div>
         <button onClick={() => setShowModal(true)}
           style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', background: '#C05621', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
           <Plus size={14} /> Registrar gasto
@@ -267,7 +304,7 @@ export default function Pagos({ data, loading, refetch, addToast }) {
       {loading
         ? <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 24 }}><SkeletonTable rows={6} cols={7} /></div>
         : grouped.length === 0
-          ? <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 40, textAlign: 'center', color: '#9CA3AF' }}>Sin datos</div>
+          ? <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 40, textAlign: 'center', color: '#9CA3AF' }}>Sin gastos para el período seleccionado</div>
           : grouped.map(({ categoria, rows }) => (
               <CatGroup key={categoria} categoria={categoria} rows={rows} onEdit={setEditing} />
             ))
