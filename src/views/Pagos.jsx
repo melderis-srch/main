@@ -21,6 +21,9 @@ const PROVEEDORES_LIST = [
   'RIO SERVICIOS',
 ];
 
+// Providers shown individually and expanded by default
+const PROVEEDORES_FRECUENTES = new Set(['NOVAX', 'IPMAGNA', 'ORLOSH', 'LAB SL', 'CROSMED']);
+
 // Rows with categoria === 'Implantes' go to the implants section grouped by emisor.
 // All other rows go to the "Otros gastos" section grouped by categoria.
 const isImplante = (g) => (g.categoria || '').trim().toLowerCase() === 'implantes';
@@ -231,8 +234,8 @@ function CatGroup({ categoria, rows, onEdit }) {
 }
 
 // Group card for IMPLANTES (by provider/emisor)
-function ProveedorGroup({ emisor, rows, onEdit }) {
-  const [open, setOpen] = useState(true);
+function ProveedorGroup({ emisor, rows, onEdit, defaultOpen = true }) {
+  const [open, setOpen] = useState(defaultOpen);
 
   const total = rows.reduce((s, g) => s + parseArgMoney(g.monto), 0);
   const pagado = rows.filter(g => g.pagado || g.saldado).reduce((s, g) => s + parseArgMoney(g.monto), 0);
@@ -258,6 +261,30 @@ function ProveedorGroup({ emisor, rows, onEdit }) {
           <span style={{ fontSize: 12, color: '#6B7280', marginRight: 6 }}>Pendiente:</span>
           <span style={{ fontSize: 14, fontWeight: 700, color: '#D97706', fontVariantNumeric: 'tabular-nums' }}>{formatARS(pendiente)}</span>
         </>}
+      </div>
+      {open && <GrupoTable rows={rows} onEdit={onEdit} />}
+    </div>
+  );
+}
+
+// Collapsed card for all fully-paid non-frequent providers
+function OtrosProveedoresGroup({ rows, onEdit }) {
+  const [open, setOpen] = useState(false);
+  const total = rows.reduce((s, g) => s + parseArgMoney(g.monto), 0);
+  const provCount = new Set(rows.map(g => (g.emisor || '').trim().toUpperCase())).size;
+
+  return (
+    <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, marginBottom: 10 }}>
+      <div
+        onClick={() => setOpen(o => !o)}
+        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', cursor: 'pointer', borderBottom: open ? '1px solid #F3F4F6' : 'none', background: open ? '#FAFAFA' : '#F9FAFB', borderRadius: open ? '10px 10px 0 0' : 10 }}
+      >
+        {open ? <ChevronDown size={15} color="#9CA3AF" /> : <ChevronRight size={15} color="#9CA3AF" />}
+        <span style={{ fontSize: 14, fontWeight: 700, color: '#6B7280', minWidth: 160 }}>Otros proveedores (pagados)</span>
+        <span style={{ fontSize: 12, color: '#9CA3AF' }}>{provCount} {provCount === 1 ? 'proveedor' : 'proveedores'} · {rows.length} {rows.length === 1 ? 'factura' : 'facturas'}</span>
+        <div style={{ flex: 1 }} />
+        <span style={{ fontSize: 12, color: '#6B7280', marginRight: 6 }}>Total:</span>
+        <span style={{ fontSize: 14, fontWeight: 700, color: '#059669', fontVariantNumeric: 'tabular-nums' }}>{formatARS(total)}</span>
       </div>
       {open && <GrupoTable rows={rows} onEdit={onEdit} />}
     </div>
@@ -316,7 +343,7 @@ export default function Pagos({ data, loading, refetch, addToast }) {
     });
   }, [gastosPagos, selectedMonth]);
 
-  // Implantes section — grouped by emisor
+  // Implantes section — grouped by emisor, split into frecuentes + otros pagados
   const implantesGroups = useMemo(() => {
     const map = {};
     filtered.filter(isImplante).forEach(g => {
@@ -324,7 +351,23 @@ export default function Pagos({ data, loading, refetch, addToast }) {
       if (!map[key]) map[key] = [];
       map[key].push(g);
     });
-    return Object.keys(map).sort().map(k => ({ emisor: k, rows: map[k] }));
+    const frecuentes = [];
+    const otrosPagados = []; // fully paid non-frequent providers, will be collapsed into one card
+    const otrosActivos = []; // non-frequent with pending items, shown individually
+    Object.keys(map).sort().forEach(k => {
+      const rows = map[k];
+      if (PROVEEDORES_FRECUENTES.has(k)) {
+        frecuentes.push({ emisor: k, rows });
+      } else {
+        const allPaid = rows.every(g => g.pagado || g.saldado);
+        if (allPaid) {
+          otrosPagados.push(...rows);
+        } else {
+          otrosActivos.push({ emisor: k, rows });
+        }
+      }
+    });
+    return { frecuentes, otrosActivos, otrosPagados };
   }, [filtered]);
 
   // Otros gastos section — grouped by categoria (excluding implantes rows)
@@ -433,13 +476,19 @@ export default function Pagos({ data, loading, refetch, addToast }) {
       {loading
         ? <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 24 }}><SkeletonTable rows={6} cols={7} /></div>
         : activeTab === 'implantes'
-          ? implantesGroups.length === 0
+          ? (implantesGroups.frecuentes.length === 0 && implantesGroups.otrosActivos.length === 0 && implantesGroups.otrosPagados.length === 0)
             ? <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 40, textAlign: 'center', color: '#9CA3AF' }}>Sin implantes en este período</div>
             : <>
                 <TabBanner {...tabKpis.implantes} count={filtered.filter(isImplante).length} />
-                {implantesGroups.map(({ emisor, rows }) => (
-                  <ProveedorGroup key={emisor} emisor={emisor} rows={rows} onEdit={setEditing} />
+                {implantesGroups.frecuentes.map(({ emisor, rows }) => (
+                  <ProveedorGroup key={emisor} emisor={emisor} rows={rows} onEdit={setEditing} defaultOpen={true} />
                 ))}
+                {implantesGroups.otrosActivos.map(({ emisor, rows }) => (
+                  <ProveedorGroup key={emisor} emisor={emisor} rows={rows} onEdit={setEditing} defaultOpen={true} />
+                ))}
+                {implantesGroups.otrosPagados.length > 0 && (
+                  <OtrosProveedoresGroup rows={implantesGroups.otrosPagados} onEdit={setEditing} />
+                )}
               </>
           : otrosGroups.length === 0
             ? <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 40, textAlign: 'center', color: '#9CA3AF' }}>Sin gastos en este período</div>
