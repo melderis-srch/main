@@ -177,12 +177,13 @@ function CatGroup({ categoria, rows, onEdit }) {
       </div>
 
       {open && (
+        <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ background: '#F9FAFB' }}>
-              <th style={{ width: 28 }} />
+              <th style={{ width: 28, position: 'sticky', top: 0, background: '#F9FAFB', zIndex: 1 }} />
               {['Proveedor', 'N° Factura', 'Fecha', 'Monto', 'Descripción', 'Estado'].map(h => (
-                <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: '#9CA3AF', fontSize: 11, whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
+                <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: '#9CA3AF', fontSize: 11, whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, background: '#F9FAFB', zIndex: 1, borderBottom: '1px solid #E5E7EB' }}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -190,6 +191,7 @@ function CatGroup({ categoria, rows, onEdit }) {
             {rows.map((g, i) => <GastoRow key={i} g={g} onEdit={onEdit} />)}
           </tbody>
         </table>
+        </div>
       )}
     </div>
   );
