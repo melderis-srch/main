@@ -115,6 +115,15 @@ function mergeCirugias(rows) {
     merged.pctMargen = merged.montoFactura > 0 ? (merged.facturaGastos / merged.montoFactura) * 100 : '';
     merged.cobrado = grupo.some(g => g.cobrado);
     merged._mergedCount = grupo.length;
+    // Desglose original de presupuesto y factura, fila por fila, para mostrar el detalle
+    merged._desglose = grupo.map(g => ({
+      medico: g.medico || '',
+      numeroFactura: g.numeroFactura || '',
+      montoPresupuesto: parseArgMoney(g.montoPresupuesto),
+      montoFactura: parseArgMoney(g.montoFactura),
+    }));
+    // Filas originales completas (con su propio rowIndex) para poder editarlas por separado
+    merged._rows = grupo;
     out.push(merged);
   });
   return out;
@@ -164,6 +173,79 @@ function CostRow({ label, value, bold }) {
   );
 }
 
+// Editor de una cirugía fusionada: muestra cada fila original del grupo por
+// separado, para no escribir montos sumados sobre una sola fila del sheet.
+function MultiEditCirugia({ rows, paciente, onClose, onSaved, addToast }) {
+  const [forms, setForms] = useState(() => rows.map(r => {
+    const f = {};
+    EDIT_FIELDS.forEach(({ k }) => { f[k] = r[k] || ''; });
+    return f;
+  }));
+  const [savingIdx, setSavingIdx] = useState(null);
+
+  const setField = (i, k, v) => setForms(fs => fs.map((f, idx) => idx === i ? { ...f, [k]: v } : f));
+
+  const handleSaveRow = async (i) => {
+    setSavingIdx(i);
+    try {
+      await gasClient.updateCirugia(rows[i].rowIndex, forms[i]);
+      addToast(`Fila ${i + 1} actualizada`, 'success');
+    } catch (e) { addToast('Error: ' + e.message, 'error'); }
+    finally { setSavingIdx(null); }
+  };
+
+  const handleSaveAll = async () => {
+    setSavingIdx('all');
+    try {
+      for (let i = 0; i < rows.length; i++) {
+        await gasClient.updateCirugia(rows[i].rowIndex, forms[i]);
+      }
+      addToast('Todas las filas actualizadas', 'success');
+      onSaved(); onClose();
+    } catch (e) { addToast('Error: ' + e.message, 'error'); }
+    finally { setSavingIdx(null); }
+  };
+
+  return (
+    <Modal open onClose={onClose} width={680}
+      title={<span style={{ fontSize:17, fontWeight:700 }}>Editar — {toTitleCase(paciente)} ({rows.length} cargas)</span>}>
+      <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+        <div style={{ fontSize:12, color:'#6B7280', background:'#FFF7F3', border:'1px solid #FBD9C2', borderRadius:7, padding:'8px 12px' }}>
+          Esta cirugía tiene varias filas cargadas (mismo paciente y fecha). Editá y guardá cada una por separado para no perder el detalle.
+        </div>
+        {rows.map((r, i) => (
+          <div key={r.rowIndex} style={{ border:'1px solid #E5E7EB', borderRadius:8, padding:12 }}>
+            <div style={{ fontSize:12, fontWeight:600, color:'#6B7280', marginBottom:8 }}>Fila {i + 1}</div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+              {EDIT_FIELDS.map(({ k, label, placeholder, list }) => (
+                <div key={k}>
+                  <label style={{ fontSize:11, color:'#9CA3AF', fontWeight:500, display:'block', marginBottom:3 }}>{label}</label>
+                  <input value={forms[i][k] || ''} onChange={e => setField(i, k, e.target.value)} placeholder={placeholder || ''} list={list}
+                    style={{ width:'100%', padding:'6px 9px', border:'1px solid #E5E7EB', borderRadius:6, fontSize:12, fontFamily:'inherit', boxSizing:'border-box' }} />
+                </div>
+              ))}
+            </div>
+            <button onClick={() => handleSaveRow(i)} disabled={savingIdx !== null}
+              style={{ marginTop:8, padding:'5px 12px', background:'none', border:'1px solid #E5E7EB', borderRadius:6, cursor: savingIdx !== null ? 'not-allowed' : 'pointer', color:'#374151', fontSize:12, fontFamily:'inherit' }}>
+              {savingIdx === i ? 'Guardando...' : 'Guardar esta fila'}
+            </button>
+          </div>
+        ))}
+        <datalist id="medicos-datalist">
+          {MEDICOS_LIST.map(m => <option key={m} value={m} />)}
+        </datalist>
+        <div style={{ display:'flex', gap:8, paddingTop:8, borderTop:'1px solid #E5E7EB' }}>
+          <button onClick={handleSaveAll} disabled={savingIdx !== null}
+            style={{ flex:1, padding:'9px', background:'#C05621', color:'#fff', border:'none', borderRadius:7, cursor: savingIdx !== null ? 'not-allowed' : 'pointer', fontSize:13, fontWeight:600, fontFamily:'inherit' }}>
+            {savingIdx === 'all' ? 'Guardando...' : 'Guardar todas y cerrar'}
+          </button>
+          <button onClick={onClose} style={{ padding:'9px 18px', background:'#F9FAFB', color:'#374151', border:'1px solid #E5E7EB', borderRadius:7, cursor:'pointer', fontSize:13, fontFamily:'inherit' }}>Cancelar</button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 function CirugiaModal({ cirugia, onClose, onCobrar, addToast }) {
   const [showCobrarForm, setShowCobrarForm] = useState(false);
   const [fechaCobro, setFechaCobro] = useState(formatDate(new Date()));
@@ -174,6 +256,7 @@ function CirugiaModal({ cirugia, onClose, onCobrar, addToast }) {
   if (!cirugia) return null;
   const badgeType = getBadgeType(cirugia);
   const margen = parseArgMoney(cirugia.pctMargen);
+  const isFusionada = cirugia._mergedCount > 1 && cirugia._rows;
 
   const handleCobrar = async () => {
     setSaving(true);
@@ -199,6 +282,10 @@ function CirugiaModal({ cirugia, onClose, onCobrar, addToast }) {
       onCobrar(); onClose();
     } catch(e) { addToast('Error: '+e.message,'error'); } finally { setSaving(false); }
   };
+
+  if (editMode && isFusionada) return (
+    <MultiEditCirugia rows={cirugia._rows} paciente={cirugia.paciente} onClose={onClose} onSaved={onCobrar} addToast={addToast} />
+  );
 
   if (editMode) return (
     <Modal open onClose={onClose} width={620}
@@ -273,6 +360,32 @@ function CirugiaModal({ cirugia, onClose, onCobrar, addToast }) {
           <InfoChip label="Fecha cobro" value={cirugia.fechaCobro}/>
           <InfoChip label="Retenciones / Otros" value={cirugia.retencionesOtros ? formatARS(parseArgMoney(cirugia.retencionesOtros)) : ''}/>
         </div>
+        {cirugia._mergedCount > 1 && cirugia._desglose && (
+          <div style={{ marginTop:10, background:'#EFF6FF', border:'1px solid #BFDBFE', borderRadius:8, padding:'10px 14px' }}>
+            <div style={{ fontSize:11, color:'#1D4ED8', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:6 }}>
+              Detalle ({cirugia._mergedCount} cargas unificadas)
+            </div>
+            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+              <thead>
+                <tr>
+                  {['Médico cargado','N° Factura','Presupuesto','Factura'].map(h => (
+                    <th key={h} style={{ textAlign:'left', padding:'3px 8px 5px 0', color:'#6B7280', fontWeight:600, fontSize:10, textTransform:'uppercase', letterSpacing:'0.03em' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {cirugia._desglose.map((d,i) => (
+                  <tr key={i} style={{ borderTop:'1px solid #DBEAFE' }}>
+                    <td style={{ padding:'5px 8px 5px 0', color:'#374151' }}>{toTitleCase(d.medico) || '—'}</td>
+                    <td style={{ padding:'5px 8px 5px 0', color:'#374151' }}>{d.numeroFactura || '—'}</td>
+                    <td style={{ padding:'5px 8px 5px 0', fontVariantNumeric:'tabular-nums', color:'#111827' }}>{d.montoPresupuesto ? formatARS(d.montoPresupuesto) : '—'}</td>
+                    <td style={{ padding:'5px 8px 5px 0', fontVariantNumeric:'tabular-nums', color:'#111827' }}>{d.montoFactura ? formatARS(d.montoFactura) : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
       {(cirugia.facturaGastos || cirugia.pctMargen) && (
         <section style={{ marginBottom:20 }}>

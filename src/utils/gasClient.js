@@ -14,7 +14,9 @@ async function gasPost(action, data) {
   if (!BASE_URL) throw new Error('VITE_GAS_URL no configurada');
   const res = await fetch(BASE_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    // text/plain evita el preflight CORS (OPTIONS) que Apps Script no responde;
+    // el backend igual parsea el body como JSON sin importar el Content-Type.
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body: JSON.stringify({ action, data }),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
