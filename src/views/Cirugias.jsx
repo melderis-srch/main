@@ -27,20 +27,95 @@ const MEDICOS_LIST = [
 ];
 const MEDICOS_SET = new Set(MEDICOS_LIST.map(m => m.trim().toLowerCase()));
 const isMedicoEstandar = (raw) => !raw || MEDICOS_SET.has(raw.trim().toLowerCase());
+const normName = (s) => (s || '').trim().toLowerCase();
 
-// Detecta cirugías duplicadas: misma fila cargada dos veces por error.
-// Si difiere algún dato relevante (fecha, médico, obra social, montos), se considera
-// otra cirugía distinta del mismo paciente y se conserva.
-function dedupeCirugias(rows) {
+function levenshtein(a, b) {
+  a = a.toLowerCase(); b = b.toLowerCase();
+  const m = a.length, n = b.length;
+  const dp = Array.from({ length: m + 1 }, (_, i) => [i, ...new Array(n).fill(0)]);
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] : 1 + Math.min(dp[i - 1][j - 1], dp[i - 1][j], dp[i][j - 1]);
+    }
+  }
+  return dp[m][n];
+}
+
+// Busca el médico canónico más cercano a un texto cargado a mano (typos, nombre incompleto, etc.)
+function bestCanonicalMedico(raw) {
+  if (!raw) return null;
+  const r = normName(raw);
+  for (const m of MEDICOS_LIST) if (normName(m) === r) return { name: m, dist: 0 };
+  const lastNameMatches = MEDICOS_LIST.filter(m => normName(m.split(',')[0]) === r);
+  if (lastNameMatches.length === 1) return { name: lastNameMatches[0], dist: 0 };
+  let best = null;
+  MEDICOS_LIST.forEach(m => {
+    const last = normName(m.split(',')[0]);
+    const d = Math.min(levenshtein(r, last), levenshtein(r, normName(m)));
+    if (!best || d < best.dist) best = { name: m, dist: d };
+  });
+  return best;
+}
+
+// Decide el nombre de médico para un grupo de filas que son la misma cirugía:
+// si hay varias grafías distintas (typo), se queda con la que mejor matchea la lista canónica.
+function resolveMedicoGrupo(rows) {
+  const candidatos = [...new Set(rows.map(r => (r.medico || '').trim()).filter(Boolean))];
+  if (candidatos.length === 0) return '';
+  let best = null;
+  candidatos.forEach(c => {
+    const m = bestCanonicalMedico(c);
+    if (m && (!best || m.dist < best.dist)) best = m;
+  });
+  if (best && best.dist <= 2) return best.name;
+  const freq = {};
+  rows.forEach(r => { const v = (r.medico || '').trim(); if (v) freq[v] = (freq[v] || 0) + 1; });
+  return Object.entries(freq).sort((a, b) => b[1] - a[1])[0][0];
+}
+
+// Suma valores monetarios distintos dentro del grupo (si dos filas tienen el mismo
+// monto, es la misma carga repetida y no se duplica; si difieren, son dos presupuestos reales).
+function sumMontosUnicos(rows, field) {
   const seen = new Set();
-  const out = [];
+  let total = 0;
+  rows.forEach(r => {
+    const v = parseArgMoney(r[field]);
+    if (!v) return;
+    const key = v.toFixed(2);
+    if (!seen.has(key)) { seen.add(key); total += v; }
+  });
+  return total;
+}
+
+const MONEY_FIELDS = ['montoPresupuesto', 'montoFactura', 'valorImplantes', 'valorDescartables', 'valorLogistica', 'valorTotalCostos', 'retencionesOtros', 'facturaGastos'];
+const TEXT_MERGE_FIELDS = ['obraSocial', 'numeroFactura', 'fechaFactura', 'fechaCobro', 'consumo', 'mes'];
+
+// Une en una sola cirugía todas las filas con el mismo paciente + fecha de cirugía.
+// Mismo nombre + misma fecha = la misma cirugía, aunque tenga el médico mal escrito
+// o dos presupuestos cargados por separado.
+function mergeCirugias(rows) {
+  const groups = new Map();
   rows.forEach(c => {
-    const key = [c.paciente, c.fechaCx, c.obraSocial, c.medico, c.montoFactura, c.numeroFactura, c.montoPresupuesto]
-      .map(v => (v ?? '').toString().trim().toLowerCase())
-      .join('|');
-    if (seen.has(key)) return;
-    seen.add(key);
-    out.push(c);
+    const key = normName(c.paciente) + '|' + (c.fechaCx || '').trim();
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(c);
+  });
+
+  const out = [];
+  groups.forEach(grupo => {
+    if (grupo.length === 1) { out.push(grupo[0]); return; }
+    const merged = { ...grupo[0] };
+    merged.medico = resolveMedicoGrupo(grupo);
+    MONEY_FIELDS.forEach(f => { merged[f] = sumMontosUnicos(grupo, f); });
+    TEXT_MERGE_FIELDS.forEach(f => {
+      const vals = [...new Set(grupo.map(g => (g[f] || '').toString().trim()).filter(Boolean))];
+      merged[f] = vals.join(' / ');
+    });
+    merged.pctMargen = merged.montoFactura > 0 ? (merged.facturaGastos / merged.montoFactura) * 100 : '';
+    merged.cobrado = grupo.some(g => g.cobrado);
+    merged._mergedCount = grupo.length;
+    out.push(merged);
   });
   return out;
 }
@@ -334,7 +409,15 @@ function MonthGroup({ mes, rows, defaultOpen, onSelect }) {
                   style={{ borderBottom:'1px solid #F9FAFB', cursor:'pointer' }}
                   onMouseEnter={e => e.currentTarget.style.background='#F9FAFB'}
                   onMouseLeave={e => e.currentTarget.style.background=''}>
-                  <td style={{ padding:'10px 14px', fontWeight:600, color:'#111827' }}>{toTitleCase(c.paciente)}</td>
+                  <td style={{ padding:'10px 14px', fontWeight:600, color:'#111827' }}>
+                    {toTitleCase(c.paciente)}
+                    {c._mergedCount > 1 && (
+                      <span title={`Se unificaron ${c._mergedCount} filas cargadas para esta misma cirugía`}
+                        style={{ marginLeft:6, fontSize:10, fontWeight:600, color:'#1D4ED8', background:'#EFF6FF', border:'1px solid #BFDBFE', borderRadius:5, padding:'1px 5px' }}>
+                        ×{c._mergedCount}
+                      </span>
+                    )}
+                  </td>
                   <td style={{ padding:'10px 14px', color:'#6B7280', whiteSpace:'nowrap', fontSize:12 }}>{c.fechaCx}</td>
                   <td style={{ padding:'10px 14px', color:'#374151' }}>
                     {toTitleCase(c.medico)}
@@ -361,7 +444,7 @@ function MonthGroup({ mes, rows, defaultOpen, onSelect }) {
 }
 
 export default function Cirugias({ data, loading, refetch, addToast }) {
-  const cirugias = useMemo(() => dedupeCirugias(data.cirugias), [data.cirugias]);
+  const cirugias = useMemo(() => mergeCirugias(data.cirugias), [data.cirugias]);
   const [search, setSearch]           = useState('');
   const [filterOS, setFilterOS]       = useState('');
   const [filterMedico, setFilterMedico] = useState('');
@@ -457,4 +540,4 @@ export default function Cirugias({ data, loading, refetch, addToast }) {
   );
 }
 
-export { CirugiaModal, dedupeCirugias, MEDICOS_LIST, isMedicoEstandar };
+export { CirugiaModal, mergeCirugias, MEDICOS_LIST, isMedicoEstandar };

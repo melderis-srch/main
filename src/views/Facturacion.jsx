@@ -7,7 +7,7 @@ import { KPICard } from '../components/UI/KPICard';
 import { SkeletonTable, SkeletonKPI } from '../components/UI/Skeleton';
 import { parseArgMoney, formatARS, parseDate, toTitleCase } from '../utils/formatters';
 import { gasClient } from '../utils/gasClient';
-import { dedupeCirugias } from './Cirugias';
+import { mergeCirugias } from './Cirugias';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -191,9 +191,10 @@ function FacturasDelMes({ ym, rows, defaultOpen, cirugiasByName, sortBy, onEdit 
 /* ── Componente principal ───────────────────────────────── */
 export default function Facturacion({ data, loading, refetch, addToast }) {
   const { ventasCobros } = data;
-  const cirugias = useMemo(() => dedupeCirugias(data.cirugias), [data.cirugias]);
+  const cirugias = useMemo(() => mergeCirugias(data.cirugias), [data.cirugias]);
   const [editing, setEditing] = useState(null);
   const [sortBy, setSortBy] = useState('emision'); // 'emision' | 'entrega'
+  const [selectedMonth, setSelectedMonth] = useState('');
 
   const currentYM = format(new Date(), 'yyyy-MM');
 
@@ -203,29 +204,51 @@ export default function Facturacion({ data, loading, refetch, addToast }) {
     return map;
   }, [cirugias]);
 
+  // Todos los meses con facturas emitidas (para el selector de período)
+  const allMonths = useMemo(() => {
+    const set = new Set();
+    ventasCobros.forEach(v => {
+      const d = parseDate(v.fechaFactura);
+      if (d) set.add(format(d, 'yyyy-MM'));
+    });
+    return Array.from(set).sort().reverse();
+  }, [ventasCobros]);
+
+  // Facturas del período seleccionado (o todas si es "Acumulado total")
+  const ventasDelPeriodo = useMemo(() => {
+    if (!selectedMonth) return ventasCobros;
+    return ventasCobros.filter(v => {
+      const d = parseDate(v.fechaFactura);
+      return d && format(d, 'yyyy-MM') === selectedMonth;
+    });
+  }, [ventasCobros, selectedMonth]);
+
   // Agrupado por mes de fecha de emisión (fechaFactura)
   const porMes = useMemo(() => {
     const map = {};
-    ventasCobros.forEach(v => {
+    ventasDelPeriodo.forEach(v => {
       const d = parseDate(v.fechaFactura);
       const ym = d ? format(d, 'yyyy-MM') : 'sin-fecha';
       if (!map[ym]) map[ym] = [];
       map[ym].push(v);
     });
     return Object.keys(map).sort().reverse().map(k => ({ ym: k, rows: map[k] }));
-  }, [ventasCobros]);
+  }, [ventasDelPeriodo]);
 
   const kpis = useMemo(() => {
     const totalCirugias = cirugias.length;
     const cirugiasFacturadas = cirugias.filter(c => (c.numeroFactura || '').toString().trim() !== '').length;
     const ratioFacturadas = totalCirugias > 0 ? cirugiasFacturadas / totalCirugias : null;
 
-    const totalFacturas = ventasCobros.length;
-    const facturasCobradas = ventasCobros.filter(v => v.fechaCobroReal).length;
+    const totalFacturas = ventasDelPeriodo.length;
+    const facturasCobradas = ventasDelPeriodo.filter(v => v.fechaCobroReal).length;
     const ratioCobradas = totalFacturas > 0 ? facturasCobradas / totalFacturas : null;
 
-    return { totalCirugias, cirugiasFacturadas, ratioFacturadas, totalFacturas, facturasCobradas, ratioCobradas };
-  }, [cirugias, ventasCobros]);
+    const pendientesEntrega = ventasDelPeriodo.filter(v => !v.fechaEntrega).length;
+    const totalFacturadoPeriodo = ventasDelPeriodo.reduce((s, v) => s + parseArgMoney(v.montoFacturado), 0);
+
+    return { totalCirugias, cirugiasFacturadas, ratioFacturadas, totalFacturas, facturasCobradas, ratioCobradas, pendientesEntrega, totalFacturadoPeriodo };
+  }, [cirugias, ventasDelPeriodo]);
 
   const handleEdit = async (form) => {
     try {
@@ -238,36 +261,55 @@ export default function Facturacion({ data, loading, refetch, addToast }) {
 
   return (
     <div>
+      {/* Selector de período + toggle orden */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <label style={{ fontSize: 13, color: '#6B7280', fontWeight: 500 }}>Período:</label>
+          <select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}
+            style={{ padding: '6px 12px', border: '1px solid #E5E7EB', borderRadius: 7, fontSize: 13, fontFamily: 'inherit', background: '#fff', color: '#111827', cursor: 'pointer' }}>
+            <option value="">Acumulado total</option>
+            {allMonths.map(m => (
+              <option key={m} value={m}>{ymLabel(m)}</option>
+            ))}
+          </select>
+          {selectedMonth && (
+            <span style={{ fontSize: 12, color: '#6B7280' }}>
+              Facturado del mes: <strong style={{ color: '#111827' }}>{formatARS(kpis.totalFacturadoPeriodo)}</strong>
+            </span>
+          )}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 13, color: '#6B7280', fontWeight: 500 }}>Resaltar orden por:</span>
+          <div style={{ display: 'flex', gap: 2, background: '#F3F4F6', borderRadius: 9, padding: 3 }}>
+            {[{ id: 'emision', label: 'Fecha de emisión' }, { id: 'entrega', label: 'Fecha de entrega' }].map(o => (
+              <button key={o.id} onClick={() => setSortBy(o.id)}
+                style={{ padding: '6px 14px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: sortBy === o.id ? 600 : 500, fontFamily: 'inherit',
+                  background: sortBy === o.id ? '#fff' : 'transparent', color: sortBy === o.id ? '#111827' : '#6B7280',
+                  boxShadow: sortBy === o.id ? '0 1px 3px rgba(0,0,0,0.08)' : 'none' }}>
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
       {/* KPIs */}
       {loading
-        ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14, marginBottom: 20 }}>{Array(2).fill(0).map((_, i) => <SkeletonKPI key={i} />)}</div>
+        ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 20 }}>{Array(3).fill(0).map((_, i) => <SkeletonKPI key={i} />)}</div>
         : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14, marginBottom: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 20 }}>
             <KPICard label="Facturadas / Cirugías" icon={FileText} color={ORANGE}
               value={kpis.ratioFacturadas !== null ? `${kpis.cirugiasFacturadas} / ${kpis.totalCirugias} (${Math.round(kpis.ratioFacturadas * 100)}%)` : '—'}
               hint="Cirugías con N° de factura cargado, sobre el total de cirugías registradas." />
             <KPICard label="Cobradas / Facturadas" icon={FileText} color={GREEN}
               value={kpis.ratioCobradas !== null ? `${kpis.facturasCobradas} / ${kpis.totalFacturas} (${Math.round(kpis.ratioCobradas * 100)}%)` : '—'}
-              hint="Facturas con cobro real registrado, sobre el total de facturas emitidas." />
+              hint="Facturas con cobro real registrado, sobre el total de facturas del período seleccionado." />
+            <KPICard label="Pendientes de entrega" icon={FileText} color={kpis.pendientesEntrega > 0 ? RED : GREEN}
+              value={String(kpis.pendientesEntrega)}
+              hint="Facturas sin fecha de entrega cargada todavía, dentro del período seleccionado." />
           </div>
         )
       }
-
-      {/* Toggle orden */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-        <span style={{ fontSize: 13, color: '#6B7280', fontWeight: 500 }}>Resaltar orden por:</span>
-        <div style={{ display: 'flex', gap: 2, background: '#F3F4F6', borderRadius: 9, padding: 3 }}>
-          {[{ id: 'emision', label: 'Fecha de emisión' }, { id: 'entrega', label: 'Fecha de entrega' }].map(o => (
-            <button key={o.id} onClick={() => setSortBy(o.id)}
-              style={{ padding: '6px 14px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: sortBy === o.id ? 600 : 500, fontFamily: 'inherit',
-                background: sortBy === o.id ? '#fff' : 'transparent', color: sortBy === o.id ? '#111827' : '#6B7280',
-                boxShadow: sortBy === o.id ? '0 1px 3px rgba(0,0,0,0.08)' : 'none' }}>
-              {o.label}
-            </button>
-          ))}
-        </div>
-        <span style={{ fontSize: 11, color: '#9CA3AF' }}>Los meses se agrupan por fecha de emisión; esto solo ordena las facturas dentro de cada mes.</span>
-      </div>
 
       {loading ? (
         <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 24 }}>
@@ -277,7 +319,7 @@ export default function Facturacion({ data, loading, refetch, addToast }) {
         porMes.length === 0
           ? <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 40, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>Sin facturas registradas</div>
           : porMes.map(({ ym, rows }) => (
-              <FacturasDelMes key={ym} ym={ym} rows={rows} defaultOpen={ym === currentYM} cirugiasByName={cirugiasByName} sortBy={sortBy} onEdit={setEditing} />
+              <FacturasDelMes key={ym} ym={ym} rows={rows} defaultOpen={ym === currentYM || !!selectedMonth} cirugiasByName={cirugiasByName} sortBy={sortBy} onEdit={setEditing} />
             ))
       )}
 
