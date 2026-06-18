@@ -9,6 +9,7 @@ import { useToast } from './hooks/useToast';
 import Dashboard from './views/Dashboard';
 import Cirugias from './views/Cirugias';
 import Cobranzas from './views/Cobranzas';
+import Facturacion from './views/Facturacion';
 import Calendario from './views/Calendario';
 import Pagos from './views/Pagos';
 import Consolidado from './views/Consolidado';
@@ -17,6 +18,7 @@ const PAGE_TITLES = {
   dashboard: 'Dashboard',
   cirugias: 'Cirugías',
   cobranzas: 'Cobranzas',
+  facturacion: 'Facturación',
   calendario: 'Calendario',
   pagos: 'Pagos / Proveedores',
   consolidado: 'Consolidado anual',
@@ -46,6 +48,7 @@ export default function SurcherieApp() {
       case 'dashboard':   return <Dashboard {...pageProps} />;
       case 'cirugias':    return <Cirugias {...pageProps} />;
       case 'cobranzas':   return <Cobranzas {...pageProps} />;
+      case 'facturacion': return <Facturacion {...pageProps} />;
       case 'calendario':  return <Calendario {...pageProps} />;
       case 'pagos':       return <Pagos {...pageProps} />;
       case 'consolidado': return <Consolidado {...pageProps} />;

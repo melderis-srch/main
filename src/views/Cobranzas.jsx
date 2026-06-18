@@ -57,6 +57,7 @@ const FIELDS_COBRO = [
   { k: 'fechaCobroEsperada', label: 'F. Cobro Esperada', placeholder: 'dd/mm/yyyy' },
   { k: 'fechaCobroReal', label: 'F. Cobro Real', placeholder: 'dd/mm/yyyy' },
   { k: 'fechaCobroCheque', label: 'F. Acreditación Cheque/Echeq', placeholder: 'dd/mm/yyyy' },
+  { k: 'fechaEntrega', label: 'Fecha Entrega', placeholder: 'dd/mm/yyyy' },
 ];
 
 /* ── Formulario ─────────────────────────────────────────── */
@@ -89,6 +90,12 @@ function CobroForm({ initial, title, saveLabel, onSubmit, onClose }) {
                 style={{ width: '100%', padding: '7px 10px', border: '1px solid #E5E7EB', borderRadius: 6, fontSize: 13, fontFamily: 'inherit', boxSizing: 'border-box' }} />
             </div>
           ))}
+        </div>
+        <div>
+          <label style={{ fontSize: 12, color: '#6B7280', fontWeight: 500, display: 'block', marginBottom: 4 }}>Notas</label>
+          <textarea value={form.notas || ''} onChange={e => set('notas', e.target.value)} rows={2}
+            placeholder="Ej: se facturó de más por error en consumo, ajustar próxima factura..."
+            style={{ width: '100%', padding: '7px 10px', border: '1px solid #E5E7EB', borderRadius: 6, fontSize: 13, fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }} />
         </div>
         <div style={{ display: 'flex', gap: 8, paddingTop: 8, borderTop: '1px solid #E5E7EB' }}>
           <button onClick={handleSave} disabled={saving}
@@ -234,44 +241,6 @@ function CobrosDelMes({ ym, rows, defaultOpen, onEdit }) {
 }
 
 /* ── Grupo por mes de factura (facturación) ─────────────── */
-function FacturacionMes({ ym, rows, onEdit }) {
-  const [open, setOpen] = useState(false);
-  const totFact = rows.reduce((s, v) => s + parseArgMoney(v.montoFacturado), 0);
-  const cobradas = rows.filter(v => v.fechaCobroReal).length;
-
-  return (
-    <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, overflow: 'hidden', marginBottom: 8 }}>
-      <div onClick={() => setOpen(o => !o)}
-        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 16px', cursor: 'pointer', borderBottom: open ? '1px solid #F3F4F6' : 'none', background: open ? '#FAFAFA' : '#fff' }}>
-        {open ? <ChevronDown size={14} color="#9CA3AF" /> : <ChevronRight size={14} color="#9CA3AF" />}
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#374151', minWidth: 150 }}>{ymLabel(ym)}</span>
-        <span style={{ fontSize: 11, background: '#ECFDF5', color: '#065F46', border: '1px solid #A7F3D0', borderRadius: 20, padding: '1px 8px', fontWeight: 600 }}>
-          {cobradas}/{rows.length} cobradas
-        </span>
-        <div style={{ flex: 1 }} />
-        <span style={{ fontSize: 12, color: '#6B7280', marginRight: 6 }}>Facturado:</span>
-        <span style={{ fontSize: 13, fontWeight: 700, color: '#111827', fontVariantNumeric: 'tabular-nums' }}>{formatARS(totFact)}</span>
-      </div>
-
-      {open && (
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-          <thead>
-            <tr style={{ background: '#F9FAFB' }}>
-              <th style={{ width: 28 }} />
-              {['Paciente', 'Obra Social', 'N° Factura', 'F. Factura', 'Neto', 'F. Cobro / Echeq', 'Mora', 'Estado'].map(h => (
-                <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: '#9CA3AF', fontSize: 11, whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((v, i) => <CobroRow key={i} v={v} onEdit={onEdit} cols="facturas" />)}
-          </tbody>
-        </table>
-      )}
-    </div>
-  );
-}
-
 /* ── Retenciones: mes → categorías ─────────────────────── */
 const RET_TYPES = [
   { key: 'retIIBB',      label: 'Ret. IIBB',     color: AMBER,     dot: '#F59E0B' },
@@ -451,7 +420,6 @@ function SectionBlock({ title, subtitle, icon: Icon, accentColor, defaultOpen = 
 
 const TABS = [
   { id: 'cobros',      label: 'Cobros realizados' },
-  { id: 'facturacion', label: 'Facturación' },
   { id: 'retenciones', label: 'Retenciones' },
 ];
 
@@ -510,18 +478,6 @@ export default function Cobranzas({ data, loading, refetch, addToast }) {
     });
     return Object.keys(map).sort().reverse().map(k => ({ ym: k, rows: map[k] }));
   }, [cobrosDelMes]);
-
-  // Facturación agrupada por mes de fechaFactura (sin filtro de mes)
-  const facturacion = useMemo(() => {
-    const map = {};
-    ventasCobros.forEach(v => {
-      const d = parseDate(v.fechaFactura);
-      const ym = d ? format(d, 'yyyy-MM') : 'sin-fecha';
-      if (!map[ym]) map[ym] = [];
-      map[ym].push(v);
-    });
-    return Object.keys(map).sort().reverse().map(k => ({ ym: k, rows: map[k] }));
-  }, [ventasCobros]);
 
   const kpis = useMemo(() => {
     const neto = (v) => {
@@ -701,14 +657,6 @@ export default function Cobranzas({ data, loading, refetch, addToast }) {
                 ))
           )}
 
-          {tab === 'facturacion' && (
-            facturacion.length === 0
-              ? <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 40, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>Sin facturación registrada</div>
-              : facturacion.map(({ ym, rows }) => (
-                  <FacturacionMes key={ym} ym={ym} rows={rows} onEdit={setEditing} />
-                ))
-          )}
-
           {tab === 'retenciones' && (
             <RetencionesSectionWrapper rows={ventasCobros} />
           )}
@@ -717,7 +665,7 @@ export default function Cobranzas({ data, loading, refetch, addToast }) {
 
       {showModal && (
         <CobroForm
-          initial={{ paciente: '', obraSocial: '', nroFactura: '', montoFacturado: '', fechaFactura: '', retGanancias: '', retIIBB: '', retSuss: '', retSellados: '', montoCobrado: '', medioPago: '', lugarPago: '', condicionPago: '', fechaCobroEsperada: '', fechaCobroReal: '', fechaCobroCheque: '' }}
+          initial={{ paciente: '', obraSocial: '', nroFactura: '', montoFacturado: '', fechaFactura: '', retGanancias: '', retIIBB: '', retSuss: '', retSellados: '', montoCobrado: '', medioPago: '', lugarPago: '', condicionPago: '', fechaCobroEsperada: '', fechaCobroReal: '', fechaCobroCheque: '', fechaEntrega: '', notas: '' }}
           title="Registrar cobro" saveLabel="Registrar cobro"
           onSubmit={handleRegister} onClose={() => setShowModal(false)}
         />

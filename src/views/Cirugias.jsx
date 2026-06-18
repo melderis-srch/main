@@ -13,8 +13,40 @@ import { es } from 'date-fns/locale';
 const MONTH_ORDER = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
                      'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
+// Lista canónica de médicos (apellido, nombre) — hoja "médicos" del sheet de Surcherie
+const MEDICOS_LIST = [
+  'Abitante, Fernando', 'Abraham, Juan Carlos', 'Amato, Daniel', 'Arneodo, Martin',
+  'Baigorria, José', 'Bocchiardo, Jorge', 'Buccari, Marcelo', 'Cozzi, Leonardo',
+  'Del Sastre, José', 'Escalada, Guillermo', 'Esquivel, Gabriel', 'Esquivel, Luciano',
+  'Fernandez, José', 'Jacob, Diego', 'Jacob, Matias', 'Jmelnizky, Sergio',
+  'Kopech, Flavio', 'Lopez Otero, Sergio', 'Martinez, Augusto', 'Mazzuferi, Fernando',
+  'Morere, Jorge', 'Morra, Brian', 'Morra, Daniel', 'Romeo, Sabrina', 'Rocca, Mario',
+  'Rossa, Guillermo', 'Salem, Alejandro', 'Santa María, José', 'Simoncini, Raul',
+  'Taleb, Cristian', 'Tolomei, Federico', 'Uranga, Martiniano', 'Valla, Luis',
+  'Vanrrel, Hernán', 'Yobe, Germán',
+];
+const MEDICOS_SET = new Set(MEDICOS_LIST.map(m => m.trim().toLowerCase()));
+const isMedicoEstandar = (raw) => !raw || MEDICOS_SET.has(raw.trim().toLowerCase());
+
+// Detecta cirugías duplicadas: misma fila cargada dos veces por error.
+// Si difiere algún dato relevante (fecha, médico, obra social, montos), se considera
+// otra cirugía distinta del mismo paciente y se conserva.
+function dedupeCirugias(rows) {
+  const seen = new Set();
+  const out = [];
+  rows.forEach(c => {
+    const key = [c.paciente, c.fechaCx, c.obraSocial, c.medico, c.montoFactura, c.numeroFactura, c.montoPresupuesto]
+      .map(v => (v ?? '').toString().trim().toLowerCase())
+      .join('|');
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(c);
+  });
+  return out;
+}
+
 const EDIT_FIELDS = [
-  { k:'medico', label:'Médico' },
+  { k:'medico', label:'Médico', list:'medicos-datalist' },
   { k:'obraSocial', label:'Obra Social' },
   { k:'fechaCx', label:'Fecha cirugía', placeholder:'dd/mm/yyyy' },
   { k:'montoPresupuesto', label:'Monto presupuesto' },
@@ -98,14 +130,17 @@ function CirugiaModal({ cirugia, onClose, onCobrar, addToast }) {
       title={<span style={{ fontSize:17, fontWeight:700 }}>Editar — {toTitleCase(cirugia.paciente)}</span>}>
       <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-          {EDIT_FIELDS.map(({k,label,placeholder}) => (
+          {EDIT_FIELDS.map(({k,label,placeholder,list}) => (
             <div key={k}>
               <label style={{ fontSize:12, color:'#6B7280', fontWeight:500, display:'block', marginBottom:4 }}>{label}</label>
-              <input value={editForm[k]||''} onChange={e => setEditForm(f=>({...f,[k]:e.target.value}))} placeholder={placeholder||''}
+              <input value={editForm[k]||''} onChange={e => setEditForm(f=>({...f,[k]:e.target.value}))} placeholder={placeholder||''} list={list}
                 style={{ width:'100%', padding:'7px 10px', border:'1px solid #E5E7EB', borderRadius:6, fontSize:13, fontFamily:'inherit', boxSizing:'border-box' }} />
             </div>
           ))}
         </div>
+        <datalist id="medicos-datalist">
+          {MEDICOS_LIST.map(m => <option key={m} value={m} />)}
+        </datalist>
         <div style={{ display:'flex', gap:8, paddingTop:8, borderTop:'1px solid #E5E7EB' }}>
           <button onClick={handleSaveEdit} disabled={saving}
             style={{ flex:1, padding:'9px', background:'#C05621', color:'#fff', border:'none', borderRadius:7, cursor: saving?'not-allowed':'pointer', fontSize:13, fontWeight:600, fontFamily:'inherit' }}>
@@ -214,10 +249,10 @@ function NuevaCirugiaModal({ onClose, onSaved, addToast }) {
     catch(e) { addToast('Error: '+e.message,'error'); } finally { setSaving(false); }
   };
 
-  const Field = ({label,k,placeholder}) => (
+  const Field = ({label,k,placeholder,list}) => (
     <div>
       <label style={{ fontSize:13, color:'#374151', fontWeight:500, display:'block', marginBottom:4 }}>{label}</label>
-      <input value={form[k]} onChange={e => set(k,e.target.value)} placeholder={placeholder}
+      <input value={form[k]} onChange={e => set(k,e.target.value)} placeholder={placeholder} list={list}
         style={{ width:'100%', padding:'8px 12px', border:'1px solid #E5E7EB', borderRadius:8, fontFamily:'inherit', fontSize:14, boxSizing:'border-box' }}/>
     </div>
   );
@@ -225,9 +260,12 @@ function NuevaCirugiaModal({ onClose, onSaved, addToast }) {
   return (
     <Modal open onClose={onClose} width={640} title={<span style={{ fontSize:17, fontWeight:700 }}>Nueva Cirugía</span>}>
       <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+        <datalist id="medicos-datalist">
+          {MEDICOS_LIST.map(m => <option key={m} value={m} />)}
+        </datalist>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
           <Field label="Paciente *" k="paciente"/>
-          <Field label="Médico" k="medico"/>
+          <Field label="Médico" k="medico" list="medicos-datalist"/>
           <Field label="Fecha cirugía" k="fechaCx" placeholder="dd/mm/yyyy"/>
           <Field label="Mes" k="mes"/>
           <Field label="Obra Social" k="obraSocial"/>
@@ -298,7 +336,13 @@ function MonthGroup({ mes, rows, defaultOpen, onSelect }) {
                   onMouseLeave={e => e.currentTarget.style.background=''}>
                   <td style={{ padding:'10px 14px', fontWeight:600, color:'#111827' }}>{toTitleCase(c.paciente)}</td>
                   <td style={{ padding:'10px 14px', color:'#6B7280', whiteSpace:'nowrap', fontSize:12 }}>{c.fechaCx}</td>
-                  <td style={{ padding:'10px 14px', color:'#374151' }}>{toTitleCase(c.medico)}</td>
+                  <td style={{ padding:'10px 14px', color:'#374151' }}>
+                    {toTitleCase(c.medico)}
+                    {c.medico && !isMedicoEstandar(c.medico) && (
+                      <span title="Nombre de médico no estandarizado — corregir desde Editar"
+                        style={{ display:'inline-block', width:6, height:6, borderRadius:'50%', background:'#D97706', marginLeft:6, verticalAlign:'middle' }} />
+                    )}
+                  </td>
                   <td style={{ padding:'10px 14px', color:'#374151' }}>{toTitleCase(c.obraSocial)}</td>
                   <td style={{ padding:'10px 14px', color:'#9CA3AF', maxWidth:160, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', fontSize:12 }}>{c.consumo}</td>
                   <td style={{ padding:'10px 14px', fontVariantNumeric:'tabular-nums', fontSize:13 }}>{c.montoFactura ? formatARS(parseArgMoney(c.montoFactura)) : '—'}</td>
@@ -317,7 +361,7 @@ function MonthGroup({ mes, rows, defaultOpen, onSelect }) {
 }
 
 export default function Cirugias({ data, loading, refetch, addToast }) {
-  const { cirugias } = data;
+  const cirugias = useMemo(() => dedupeCirugias(data.cirugias), [data.cirugias]);
   const [search, setSearch]           = useState('');
   const [filterOS, setFilterOS]       = useState('');
   const [filterMedico, setFilterMedico] = useState('');
@@ -413,4 +457,4 @@ export default function Cirugias({ data, loading, refetch, addToast }) {
   );
 }
 
-export { CirugiaModal };
+export { CirugiaModal, dedupeCirugias, MEDICOS_LIST, isMedicoEstandar };
