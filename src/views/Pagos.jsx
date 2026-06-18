@@ -342,9 +342,10 @@ export default function Pagos({ data, loading, refetch, addToast }) {
     if (selectedMonth === 'all') return gastosPagos;
     return gastosPagos.filter(g => {
       const isPaid = g.pagado || g.saldado;
-      // Paid items: filter by when they were actually paid
-      // Pending/projected: filter by invoice emission date
-      const dateStr = isPaid ? g.fechaPago : g.fechaEmision;
+      // Paid items: filter by when they were actually paid (fall back to
+      // emission date if fechaPago wasn't filled in, so the row never
+      // disappears entirely from every month).
+      const dateStr = (isPaid && g.fechaPago) ? g.fechaPago : g.fechaEmision;
       const d = parseDate(dateStr);
       return d && format(d, 'yyyy-MM') === selectedMonth;
     });
