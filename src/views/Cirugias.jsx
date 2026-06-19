@@ -88,16 +88,25 @@ function sumMontosUnicos(rows, field) {
   return total;
 }
 
+// Resuelve el médico de una fila a su forma canónica para poder agrupar de forma
+// estable (si no hay buen match, devuelve el texto tal cual normalizado).
+function medicoKeyKanonico(raw) {
+  if (!raw || !raw.trim()) return '';
+  const m = bestCanonicalMedico(raw);
+  return (m && m.dist <= 2) ? normName(m.name) : normName(raw);
+}
+
 const MONEY_FIELDS = ['montoPresupuesto', 'montoFactura', 'valorImplantes', 'valorDescartables', 'valorLogistica', 'valorTotalCostos', 'retencionesOtros', 'facturaGastos'];
 const TEXT_MERGE_FIELDS = ['obraSocial', 'numeroFactura', 'fechaFactura', 'fechaCobro', 'consumo', 'mes'];
 
-// Une en una sola cirugía todas las filas con el mismo paciente + fecha de cirugía.
-// Mismo nombre + misma fecha = la misma cirugía, aunque tenga el médico mal escrito
-// o dos presupuestos cargados por separado.
+// Une en una sola cirugía todas las filas con el mismo paciente + médico + fecha de
+// cirugía. El médico se resuelve primero contra la lista canónica para que un typo
+// ("Jacov" vs "Jacob") no impida fusionar la misma cirugía; mismo paciente/médico/fecha
+// con dos presupuestos cargados por separado también se suma en una sola cirugía.
 function mergeCirugias(rows) {
   const groups = new Map();
   rows.forEach(c => {
-    const key = normName(c.paciente) + '|' + (c.fechaCx || '').trim();
+    const key = normName(c.paciente) + '|' + medicoKeyKanonico(c.medico) + '|' + (c.fechaCx || '').trim();
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(c);
   });
