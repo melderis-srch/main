@@ -1,17 +1,18 @@
 'use client';
 import { useState, useMemo } from 'react';
-import { ChevronDown, ChevronRight, FileText, CheckCircle2, XCircle, Clock, TrendingUp } from 'lucide-react';
+import { ChevronDown, ChevronRight, FileText, CheckCircle2, Clock, TrendingUp, AlertTriangle, PhoneCall } from 'lucide-react';
 import { Badge } from '../components/UI/Badge';
 import { KPICard } from '../components/UI/KPICard';
 import { SkeletonTable, SkeletonKPI } from '../components/UI/Skeleton';
-import { formatARS, parseDate, toTitleCase } from '../utils/formatters';
-import { format } from 'date-fns';
+import { formatARS, parseDate, toTitleCase, daysDiff } from '../utils/formatters';
+import { format, startOfWeek, endOfWeek } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 const ORANGE = '#C05621';
 const GREEN  = '#059669';
 const RED    = '#DC2626';
 const AMBER  = '#D97706';
+const BLUE   = '#1D4ED8';
 
 function ymLabel(ym) {
   if (!ym || ym === 'sin-fecha') return 'Sin fecha';
@@ -20,12 +21,208 @@ function ymLabel(ym) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+function weekKey(date) {
+  const start = startOfWeek(date, { weekStartsOn: 1 });
+  return format(start, 'yyyy-MM-dd');
+}
+
+function weekLabel(key) {
+  const start = parseDate2(key);
+  const end = endOfWeek(start, { weekStartsOn: 1 });
+  return `${format(start, 'dd/MM')} – ${format(end, 'dd/MM')}`;
+}
+
+// parseDate de formatters espera dd/MM/yyyy o ISO; acá la key ya es ISO yyyy-MM-dd
+function parseDate2(key) {
+  const [y, m, d] = key.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
 function ClasificacionBadge({ c }) {
   if (c === 'convertido') return <Badge type="cobrado">Convertido</Badge>;
   if (c === 'rechazado') return <Badge type="vencido">Rechazado</Badge>;
   return <Badge type="porVencer">Pendiente</Badge>;
 }
 
+/* ── Tab: Pendientes a gestionar ─────────────────────────── */
+function PendientesTab({ rows }) {
+  const sorted = useMemo(() => {
+    return [...rows].sort((a, b) => {
+      const da = parseDate(a.fechaCotizacion);
+      const db = parseDate(b.fechaCotizacion);
+      if (!da && !db) return 0;
+      if (!da) return 1;
+      if (!db) return -1;
+      return da - db; // más antiguos primero = más urgentes
+    });
+  }, [rows]);
+
+  if (sorted.length === 0) {
+    return (
+      <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 40, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>
+        No hay presupuestos pendientes de autorización 🎉
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, overflow: 'hidden' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <thead>
+          <tr style={{ background: '#F9FAFB' }}>
+            {['', 'Paciente', 'Médico', 'Obra Social', 'F. Cotización', 'Días esperando', 'Monto', 'Estado'].map(h => (
+              <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: '#9CA3AF', fontSize: 11, whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map((p, i) => {
+            const dias = daysDiff(parseDate(p.fechaCotizacion));
+            const urgente = dias !== null && dias >= 14;
+            return (
+              <tr key={i} style={{ borderBottom: '1px solid #F3F4F6', background: urgente ? '#FFFBEB' : '#fff' }}>
+                <td style={{ padding: '10px 12px', width: 28 }}>
+                  {urgente && <AlertTriangle size={14} color={AMBER} />}
+                </td>
+                <td style={{ padding: '10px 12px', fontWeight: 500 }}>{toTitleCase(p.paciente)}</td>
+                <td style={{ padding: '10px 12px', color: '#374151' }}>{toTitleCase(p.medico)}</td>
+                <td style={{ padding: '10px 12px', color: '#374151' }}>{toTitleCase(p.obraSocial)}</td>
+                <td style={{ padding: '10px 12px', fontVariantNumeric: 'tabular-nums', fontSize: 12, color: '#9CA3AF', whiteSpace: 'nowrap' }}>{p.fechaCotizacion || '—'}</td>
+                <td style={{ padding: '10px 12px', fontVariantNumeric: 'tabular-nums', fontSize: 12, fontWeight: 600, color: urgente ? AMBER : '#6B7280' }}>
+                  {dias !== null ? `${dias}d` : '—'}
+                </td>
+                <td style={{ padding: '10px 12px', fontVariantNumeric: 'tabular-nums', fontSize: 12, fontWeight: 600, color: '#111827' }}>{formatARS(p.monto)}</td>
+                <td style={{ padding: '10px 12px' }}>
+                  <span style={{ fontSize: 11, color: '#6B7280' }}>{p.estado || '(sin estado)'}</span>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/* ── Tab: Resumen semanal ─────────────────────────────────── */
+function SemanalTab({ presupuestos }) {
+  const data = useMemo(() => {
+    const map = {};
+    const touch = (key) => { if (!map[key]) map[key] = { presupuestado: 0, autorizado: 0 }; return map[key]; };
+    presupuestos.forEach(p => {
+      const dCot = parseDate(p.fechaCotizacion);
+      if (dCot) touch(weekKey(dCot)).presupuestado += p.monto;
+      const dAut = parseDate(p.fechaAutorizacion);
+      if (dAut && p.estado === 'Autorizada') touch(weekKey(dAut)).autorizado += p.monto;
+    });
+    return Object.keys(map).sort().reverse().map(k => ({ key: k, ...map[k] }));
+  }, [presupuestos]);
+
+  if (data.length === 0) {
+    return <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 40, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>Sin datos</div>;
+  }
+
+  return (
+    <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, overflow: 'hidden' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <thead>
+          <tr style={{ background: '#F9FAFB' }}>
+            {['Semana', 'Presupuestado', 'Autorizado'].map(h => (
+              <th key={h} style={{ padding: '8px 12px', textAlign: h === 'Semana' ? 'left' : 'right', fontWeight: 600, color: '#9CA3AF', fontSize: 11, whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {data.map(({ key, presupuestado, autorizado }) => (
+            <tr key={key} style={{ borderBottom: '1px solid #F3F4F6' }}>
+              <td style={{ padding: '8px 12px', color: '#374151', whiteSpace: 'nowrap' }}>{weekLabel(key)}</td>
+              <td style={{ padding: '8px 12px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: ORANGE, fontWeight: 600 }}>{presupuestado ? formatARS(presupuestado) : '—'}</td>
+              <td style={{ padding: '8px 12px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: GREEN, fontWeight: 600 }}>{autorizado ? formatARS(autorizado) : '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/* ── Tab: Resumen mensual (pivot tipo Sheet) ────────────────
+   Filas:
+   - Presupuesto: monto cotizado, por mes de Fecha de cotización
+   - Autorizado: monto autorizado, por mes de Fecha de autorización
+   - Cirugías realizadas: monto realizado, por mes de Fecha de cx
+   - Autorizado con fecha sin realizarse: autorizado + fecha de cx, sin realizar, por mes de Fecha de cx
+   - Autorizaciones del mes sin fecha: autorizado sin fecha de cx, por mes de Fecha de autorización
+============================================================ */
+function MensualTab({ presupuestos }) {
+  const { months, rows } = useMemo(() => {
+    const monthSet = new Set();
+    const presupuestoPorMes = {};
+    const autorizadoPorMes = {};
+    const realizadoPorMes = {};
+    const autorizadoSinRealizarPorMes = {};
+    const autorizacionesSinFechaPorMes = {};
+
+    const add = (map, ym, monto) => { map[ym] = (map[ym] || 0) + monto; monthSet.add(ym); };
+
+    presupuestos.forEach(p => {
+      const dCot = parseDate(p.fechaCotizacion);
+      if (dCot) add(presupuestoPorMes, format(dCot, 'yyyy-MM'), p.monto);
+
+      const dAut = parseDate(p.fechaAutorizacion);
+      const esAutorizada = p.estado === 'Autorizada';
+      if (dAut && esAutorizada) add(autorizadoPorMes, format(dAut, 'yyyy-MM'), p.monto);
+
+      const dCx = parseDate(p.fechaCx);
+      if (dCx && p.realizada) add(realizadoPorMes, format(dCx, 'yyyy-MM'), p.monto);
+      if (dCx && esAutorizada && !p.realizada) add(autorizadoSinRealizarPorMes, format(dCx, 'yyyy-MM'), p.monto);
+      if (!dCx && esAutorizada && dAut) add(autorizacionesSinFechaPorMes, format(dAut, 'yyyy-MM'), p.monto);
+    });
+
+    const monthsSorted = Array.from(monthSet).sort().reverse();
+    const rows = [
+      { label: 'Presupuesto',                          color: ORANGE, map: presupuestoPorMes },
+      { label: 'Autorizado',                            color: GREEN,  map: autorizadoPorMes },
+      { label: 'Cirugías realizadas',                   color: BLUE,   map: realizadoPorMes },
+      { label: 'Autorizado con fecha sin realizarse',   color: AMBER,  map: autorizadoSinRealizarPorMes },
+      { label: 'Autorizaciones del mes sin fecha',      color: RED,    map: autorizacionesSinFechaPorMes },
+    ];
+    return { months: monthsSorted, rows };
+  }, [presupuestos]);
+
+  if (months.length === 0) {
+    return <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 40, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>Sin datos</div>;
+  }
+
+  return (
+    <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, overflow: 'auto' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: 800 }}>
+        <thead>
+          <tr style={{ background: '#F9FAFB' }}>
+            <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: '#9CA3AF', fontSize: 11, whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', left: 0, background: '#F9FAFB' }}>Métrica</th>
+            {months.map(m => (
+              <th key={m} style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, color: '#9CA3AF', fontSize: 11, whiteSpace: 'nowrap' }}>{ymLabel(m)}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(({ label, color, map }) => (
+            <tr key={label} style={{ borderBottom: '1px solid #F3F4F6' }}>
+              <td style={{ padding: '8px 12px', color: '#374151', fontWeight: 600, whiteSpace: 'nowrap', position: 'sticky', left: 0, background: '#fff' }}>{label}</td>
+              {months.map(m => (
+                <td key={m} style={{ padding: '8px 12px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: map[m] ? color : '#D1D5DB' }}>
+                  {map[m] ? formatARS(map[m]) : '—'}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/* ── Tab: Detalle (todas las filas, agrupadas por mes) ──────── */
 function PresupuestoRow({ p }) {
   const [open, setOpen] = useState(false);
   return (
@@ -111,11 +308,43 @@ function MesGroup({ ym, rows, defaultOpen }) {
   );
 }
 
+function DetalleTab({ rows }) {
+  const grouped = useMemo(() => {
+    const map = {};
+    rows.forEach(p => {
+      const d = parseDate(p.fechaCotizacion);
+      const ym = d ? format(d, 'yyyy-MM') : 'sin-fecha';
+      if (!map[ym]) map[ym] = [];
+      map[ym].push(p);
+    });
+    return Object.keys(map).sort().reverse().map(k => ({ ym: k, rows: map[k] }));
+  }, [rows]);
+
+  const currentYM = format(new Date(), 'yyyy-MM');
+
+  if (grouped.length === 0) {
+    return <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 40, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>Sin presupuestos que coincidan con el filtro</div>;
+  }
+
+  return grouped.map(({ ym, rows }) => (
+    <MesGroup key={ym} ym={ym} rows={rows} defaultOpen={ym === currentYM} />
+  ));
+}
+
+/* ── Componente principal ───────────────────────────────── */
+const TABS = [
+  { id: 'pendientes', label: 'Pendientes a gestionar', icon: PhoneCall },
+  { id: 'semanal',    label: 'Resumen semanal' },
+  { id: 'mensual',    label: 'Resumen mensual' },
+  { id: 'detalle',    label: 'Detalle' },
+];
+
 export default function Presupuestos({ data, loading }) {
   const { presupuestos } = data;
   const [search, setSearch] = useState('');
   const [filterMedico, setFilterMedico] = useState('');
   const [filterClasificacion, setFilterClasificacion] = useState('');
+  const [tab, setTab] = useState('pendientes');
 
   const medicos = useMemo(() => [...new Set(presupuestos.map(p => p.medico).filter(Boolean))].sort(), [presupuestos]);
 
@@ -126,16 +355,7 @@ export default function Presupuestos({ data, loading }) {
     return true;
   }), [presupuestos, search, filterMedico, filterClasificacion]);
 
-  const grouped = useMemo(() => {
-    const map = {};
-    filtered.forEach(p => {
-      const d = parseDate(p.fechaCotizacion);
-      const ym = d ? format(d, 'yyyy-MM') : 'sin-fecha';
-      if (!map[ym]) map[ym] = [];
-      map[ym].push(p);
-    });
-    return Object.keys(map).sort().reverse().map(k => ({ ym: k, rows: map[k] }));
-  }, [filtered]);
+  const pendientesFiltrados = useMemo(() => filtered.filter(p => p.clasificacion === 'pendiente'), [filtered]);
 
   const kpis = useMemo(() => {
     const convertidos = presupuestos.filter(p => p.clasificacion === 'convertido');
@@ -143,12 +363,11 @@ export default function Presupuestos({ data, loading }) {
     const pendientes = presupuestos.filter(p => p.clasificacion === 'pendiente');
     const totalPresupuestado = presupuestos.reduce((s, p) => s + p.monto, 0);
     const totalConvertido = convertidos.reduce((s, p) => s + p.monto, 0);
+    const totalPendiente = pendientes.reduce((s, p) => s + p.monto, 0);
     const decididos = convertidos.length + rechazados.length;
     const tasaConversion = decididos > 0 ? (convertidos.length / decididos) * 100 : 0;
-    return { convertidos, rechazados, pendientes, totalPresupuestado, totalConvertido, tasaConversion };
+    return { convertidos, rechazados, pendientes, totalPresupuestado, totalConvertido, totalPendiente, tasaConversion };
   }, [presupuestos]);
-
-  const currentYM = format(new Date(), 'yyyy-MM');
 
   return (
     <div>
@@ -156,14 +375,14 @@ export default function Presupuestos({ data, loading }) {
         ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 20 }}>{Array(4).fill(0).map((_, i) => <SkeletonKPI key={i} />)}</div>
         : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 20 }}>
+            <KPICard label="Pendientes a gestionar" value={String(kpis.pendientes.length)} sub={formatARS(kpis.totalPendiente)} icon={PhoneCall} color={AMBER}
+              hint="Cotizados, por salir, o autorizados sin fecha de cirugía todavía. Para hacer seguimiento." />
             <KPICard label="Tasa de conversión" value={`${kpis.tasaConversion.toFixed(0)}%`} icon={TrendingUp} color={GREEN}
               hint="Convertidos / (convertidos + rechazados), sin contar los pendientes." />
             <KPICard label="Monto presupuestado" value={formatARS(kpis.totalPresupuestado)} icon={FileText} color={ORANGE}
               hint="Suma de todos los presupuestos cotizados (precio cotización + mejora)." />
             <KPICard label="Convertidos" value={String(kpis.convertidos.length)} sub={formatARS(kpis.totalConvertido)} icon={CheckCircle2} color={GREEN}
               hint="Autorizados y con fecha de cirugía confirmada." />
-            <KPICard label="Pendientes" value={String(kpis.pendientes.length)} icon={Clock} color={AMBER}
-              hint="Cotizados, por salir, o autorizados sin fecha de cirugía todavía." />
           </div>
         )
       }
@@ -176,27 +395,44 @@ export default function Presupuestos({ data, loading }) {
           <option value="">Todos los médicos</option>
           {medicos.map(m => <option key={m} value={m}>{toTitleCase(m)}</option>)}
         </select>
-        <select value={filterClasificacion} onChange={e => setFilterClasificacion(e.target.value)}
-          style={{ padding: '7px 12px', border: '1px solid #E5E7EB', borderRadius: 7, fontSize: 13, fontFamily: 'inherit', background: '#fff' }}>
-          <option value="">Todos los estados</option>
-          <option value="convertido">Convertido</option>
-          <option value="pendiente">Pendiente</option>
-          <option value="rechazado">Rechazado</option>
-        </select>
+        {tab === 'detalle' && (
+          <select value={filterClasificacion} onChange={e => setFilterClasificacion(e.target.value)}
+            style={{ padding: '7px 12px', border: '1px solid #E5E7EB', borderRadius: 7, fontSize: 13, fontFamily: 'inherit', background: '#fff' }}>
+            <option value="">Todos los estados</option>
+            <option value="convertido">Convertido</option>
+            <option value="pendiente">Pendiente</option>
+            <option value="rechazado">Rechazado</option>
+          </select>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', gap: 2, background: '#F3F4F6', borderRadius: 9, padding: 3, marginBottom: 20, width: 'fit-content' }}>
+        {TABS.map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 16px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: tab === t.id ? 600 : 500, fontFamily: 'inherit',
+              background: tab === t.id ? '#fff' : 'transparent',
+              color: tab === t.id ? '#111827' : '#6B7280',
+              boxShadow: tab === t.id ? '0 1px 3px rgba(0,0,0,0.08)' : 'none' }}>
+            {t.icon && <t.icon size={13} />}
+            {t.label}
+            {t.id === 'pendientes' && kpis.pendientes.length > 0 && (
+              <span style={{ background: AMBER, color: '#fff', borderRadius: 10, padding: '1px 6px', fontSize: 10, fontWeight: 700 }}>{kpis.pendientes.length}</span>
+            )}
+          </button>
+        ))}
       </div>
 
       {loading ? (
         <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 24 }}>
           <SkeletonTable rows={6} cols={6} />
         </div>
-      ) : grouped.length === 0 ? (
-        <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 40, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>
-          Sin presupuestos que coincidan con el filtro
-        </div>
       ) : (
-        grouped.map(({ ym, rows }) => (
-          <MesGroup key={ym} ym={ym} rows={rows} defaultOpen={ym === currentYM} />
-        ))
+        <>
+          {tab === 'pendientes' && <PendientesTab rows={pendientesFiltrados} />}
+          {tab === 'semanal' && <SemanalTab presupuestos={filtered} />}
+          {tab === 'mensual' && <MensualTab presupuestos={filtered} />}
+          {tab === 'detalle' && <DetalleTab rows={filtered} />}
+        </>
       )}
     </div>
   );

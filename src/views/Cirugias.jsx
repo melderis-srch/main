@@ -520,8 +520,8 @@ function MonthGroup({ mes, rows, defaultOpen, onSelect }) {
           <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
             <thead>
               <tr style={{ background:'#FAFAFA' }}>
-                {['Paciente','Fecha Cx','Médico','Obra Social','Materiales','Factura','Costo Total','Margen $','Margen %','Estado'].map(h => (
-                  <th key={h} style={{ padding:'8px 14px', textAlign:'left', fontWeight:600, color:'#9CA3AF', fontSize:11, borderBottom:'1px solid #F3F4F6', whiteSpace:'nowrap', textTransform:'uppercase', letterSpacing:'0.04em' }}>{h}</th>
+                {['Paciente','Fecha Cx','Médico','Obra Social','Estado'].map(h => (
+                  <th key={h} style={{ padding:'10px 14px', textAlign:'left', fontWeight:600, color:'#9CA3AF', fontSize:11, borderBottom:'1px solid #F3F4F6', whiteSpace:'nowrap', textTransform:'uppercase', letterSpacing:'0.04em' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -531,7 +531,7 @@ function MonthGroup({ mes, rows, defaultOpen, onSelect }) {
                   style={{ borderBottom:'1px solid #F9FAFB', cursor:'pointer' }}
                   onMouseEnter={e => e.currentTarget.style.background='#F9FAFB'}
                   onMouseLeave={e => e.currentTarget.style.background=''}>
-                  <td style={{ padding:'10px 14px', fontWeight:600, color:'#111827' }}>
+                  <td style={{ padding:'13px 14px', fontWeight:600, color:'#111827' }}>
                     {toTitleCase(c.paciente)}
                     {c._mergedCount > 1 && (
                       <span title={`Se unificaron ${c._mergedCount} filas cargadas para esta misma cirugía`}
@@ -540,21 +540,16 @@ function MonthGroup({ mes, rows, defaultOpen, onSelect }) {
                       </span>
                     )}
                   </td>
-                  <td style={{ padding:'10px 14px', color:'#6B7280', whiteSpace:'nowrap', fontSize:12 }}>{c.fechaCx}</td>
-                  <td style={{ padding:'10px 14px', color:'#374151' }}>
-                    {toTitleCase(c.medico)}
+                  <td style={{ padding:'13px 14px', color:'#6B7280', whiteSpace:'nowrap', fontSize:12, fontVariantNumeric:'tabular-nums' }}>{c.fechaCx || '—'}</td>
+                  <td style={{ padding:'13px 14px', color:'#374151' }}>
+                    {toTitleCase(c.medico) || '—'}
                     {c.medico && !isMedicoEstandar(c.medico) && (
                       <span title="Nombre de médico no estandarizado — corregir desde Editar"
                         style={{ display:'inline-block', width:6, height:6, borderRadius:'50%', background:'#D97706', marginLeft:6, verticalAlign:'middle' }} />
                     )}
                   </td>
-                  <td style={{ padding:'10px 14px', color:'#374151' }}>{toTitleCase(c.obraSocial)}</td>
-                  <td style={{ padding:'10px 14px', color:'#9CA3AF', maxWidth:160, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', fontSize:12 }}>{c.consumo}</td>
-                  <td style={{ padding:'10px 14px', fontVariantNumeric:'tabular-nums', fontSize:13 }}>{c.montoFactura ? formatARS(parseArgMoney(c.montoFactura)) : '—'}</td>
-                  <td style={{ padding:'10px 14px', fontVariantNumeric:'tabular-nums', fontSize:13, color:'#6B7280' }}>{c.valorTotalCostos ? formatARS(parseArgMoney(c.valorTotalCostos)) : '—'}</td>
-                  <td style={{ padding:'10px 14px', fontVariantNumeric:'tabular-nums', fontSize:13, color: parseArgMoney(c.facturaGastos)>=0?'#059669':'#DC2626' }}>{c.facturaGastos ? formatARS(parseArgMoney(c.facturaGastos)) : '—'}</td>
-                  <td style={{ padding:'10px 14px', fontVariantNumeric:'tabular-nums', fontSize:13, color:'#C05621' }}>{c.pctMargen ? formatPct(parseArgMoney(c.pctMargen)) : '—'}</td>
-                  <td style={{ padding:'10px 14px' }}><Badge type={getBadgeType(c)}>{getBadgeLabel(c)}</Badge></td>
+                  <td style={{ padding:'13px 14px', color:'#374151' }}>{toTitleCase(c.obraSocial) || '—'}</td>
+                  <td style={{ padding:'13px 14px' }}><Badge type={getBadgeType(c)}>{getBadgeLabel(c)}</Badge></td>
                 </tr>
               ))}
             </tbody>
