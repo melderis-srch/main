@@ -44,39 +44,39 @@ function ClasificacionBadge({ c }) {
   return <Badge type="porVencer">Pendiente</Badge>;
 }
 
+// Apellido = primera palabra del nombre (los nombres se cargan apellido primero)
+function apellido(str) {
+  if (!str) return '';
+  const first = String(str).trim().split(/\s+/)[0];
+  return toTitleCase(first);
+}
+
+function nombrePar(p) {
+  return `${apellido(p.paciente) || '—'} - ${apellido(p.medico) || '—'}`;
+}
+
 /* ── Tab: Pendientes a gestionar ─────────────────────────── */
-function PendientesTab({ rows }) {
-  const sorted = useMemo(() => {
-    return [...rows].sort((a, b) => {
-      const da = parseDate(a.fechaCotizacion);
-      const db = parseDate(b.fechaCotizacion);
-      if (!da && !db) return 0;
-      if (!da) return 1;
-      if (!db) return -1;
-      return da - db; // más antiguos primero = más urgentes
-    });
-  }, [rows]);
-
-  if (sorted.length === 0) {
-    return (
-      <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 40, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>
-        No hay presupuestos pendientes de autorización 🎉
-      </div>
-    );
-  }
-
+function PendientesGroup({ title, hint, color, rows, icon: Icon }) {
+  if (rows.length === 0) return null;
   return (
-    <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, overflow: 'hidden' }}>
+    <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, overflow: 'hidden', marginBottom: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', borderBottom: '1px solid #F3F4F6', background: '#FAFAFA' }}>
+        {Icon && <Icon size={15} color={color} />}
+        <span style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>{title}</span>
+        <span style={{ fontSize: 11, color: '#9CA3AF', fontWeight: 600, background: '#F3F4F6', borderRadius: 10, padding: '1px 8px' }}>{rows.length}</span>
+        <div style={{ flex: 1 }} />
+        <span style={{ fontSize: 11.5, color: '#9CA3AF' }}>{hint}</span>
+      </div>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
         <thead>
           <tr style={{ background: '#F9FAFB' }}>
-            {['', 'Paciente', 'Médico', 'Obra Social', 'F. Cotización', 'Días esperando', 'Monto', 'Estado'].map(h => (
+            {['', 'Paciente - Médico', 'Obra Social', 'F. Cotización', 'Días esperando', 'Monto', 'Estado'].map(h => (
               <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: '#9CA3AF', fontSize: 11, whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {sorted.map((p, i) => {
+          {rows.map((p, i) => {
             const dias = daysDiff(parseDate(p.fechaCotizacion));
             const urgente = dias !== null && dias >= 14;
             return (
@@ -84,8 +84,7 @@ function PendientesTab({ rows }) {
                 <td style={{ padding: '10px 12px', width: 28 }}>
                   {urgente && <AlertTriangle size={14} color={AMBER} />}
                 </td>
-                <td style={{ padding: '10px 12px', fontWeight: 500 }}>{toTitleCase(p.paciente)}</td>
-                <td style={{ padding: '10px 12px', color: '#374151' }}>{toTitleCase(p.medico)}</td>
+                <td style={{ padding: '10px 12px', fontWeight: 500 }}>{nombrePar(p)}</td>
                 <td style={{ padding: '10px 12px', color: '#374151' }}>{toTitleCase(p.obraSocial)}</td>
                 <td style={{ padding: '10px 12px', fontVariantNumeric: 'tabular-nums', fontSize: 12, color: '#9CA3AF', whiteSpace: 'nowrap' }}>{p.fechaCotizacion || '—'}</td>
                 <td style={{ padding: '10px 12px', fontVariantNumeric: 'tabular-nums', fontSize: 12, fontWeight: 600, color: urgente ? AMBER : '#6B7280' }}>
@@ -104,9 +103,56 @@ function PendientesTab({ rows }) {
   );
 }
 
-/* ── Tab: Resumen semanal ─────────────────────────────────── */
+function PendientesTab({ rows }) {
+  const { autorizadosSinFecha, cotizadosSinRespuesta } = useMemo(() => {
+    const byUrgency = (a, b) => {
+      const da = parseDate(a.fechaCotizacion);
+      const db = parseDate(b.fechaCotizacion);
+      if (!da && !db) return 0;
+      if (!da) return 1;
+      if (!db) return -1;
+      return da - db; // más antiguos primero = más urgentes
+    };
+    const autorizadosSinFecha = rows
+      .filter(p => String(p.estado || '').trim().toUpperCase() === 'AUTORIZADA')
+      .sort(byUrgency);
+    const cotizadosSinRespuesta = rows
+      .filter(p => String(p.estado || '').trim().toUpperCase() !== 'AUTORIZADA')
+      .sort(byUrgency);
+    return { autorizadosSinFecha, cotizadosSinRespuesta };
+  }, [rows]);
+
+  if (rows.length === 0) {
+    return (
+      <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 40, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>
+        No hay presupuestos pendientes de autorización 🎉
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <PendientesGroup
+        title="Autorizado, sin fecha de cirugía"
+        hint="Ya aprobaron el presupuesto — falta coordinar la fecha"
+        color={GREEN}
+        icon={CheckCircle2}
+        rows={autorizadosSinFecha}
+      />
+      <PendientesGroup
+        title="Cotizado, sin respuesta de autorización"
+        hint="Todavía no contestaron si lo autorizan o no"
+        color={AMBER}
+        icon={Clock}
+        rows={cotizadosSinRespuesta}
+      />
+    </div>
+  );
+}
+
+/* ── Tab: Resumen semanal (agrupado por mes) ─────────────── */
 function SemanalTab({ presupuestos }) {
-  const data = useMemo(() => {
+  const meses = useMemo(() => {
     const map = {};
     const touch = (key) => { if (!map[key]) map[key] = { presupuestado: 0, autorizado: 0 }; return map[key]; };
     presupuestos.forEach(p => {
@@ -115,33 +161,64 @@ function SemanalTab({ presupuestos }) {
       const dAut = parseDate(p.fechaAutorizacion);
       if (dAut && p.estado === 'Autorizada') touch(weekKey(dAut)).autorizado += p.monto;
     });
-    return Object.keys(map).sort().reverse().map(k => ({ key: k, ...map[k] }));
+    const weeks = Object.keys(map).sort().reverse().map(k => ({ key: k, ...map[k] }));
+
+    const byMonth = {};
+    weeks.forEach(w => {
+      const ym = format(parseDate2(w.key), 'yyyy-MM');
+      if (!byMonth[ym]) byMonth[ym] = { ym, weeks: [], presupuestado: 0, autorizado: 0 };
+      byMonth[ym].weeks.push(w);
+      byMonth[ym].presupuestado += w.presupuestado;
+      byMonth[ym].autorizado += w.autorizado;
+    });
+    return Object.keys(byMonth).sort().reverse().map(k => byMonth[k]);
   }, [presupuestos]);
 
-  if (data.length === 0) {
+  if (meses.length === 0) {
     return <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 40, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>Sin datos</div>;
   }
 
+  const currentYM = format(new Date(), 'yyyy-MM');
+
+  return meses.map(m => (
+    <SemanalMesGroup key={m.ym} mes={m} defaultOpen={m.ym === currentYM} />
+  ));
+}
+
+function SemanalMesGroup({ mes, defaultOpen }) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
-    <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, overflow: 'hidden' }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-        <thead>
-          <tr style={{ background: '#F9FAFB' }}>
-            {['Semana', 'Presupuestado', 'Autorizado'].map(h => (
-              <th key={h} style={{ padding: '8px 12px', textAlign: h === 'Semana' ? 'left' : 'right', fontWeight: 600, color: '#9CA3AF', fontSize: 11, whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {data.map(({ key, presupuestado, autorizado }) => (
-            <tr key={key} style={{ borderBottom: '1px solid #F3F4F6' }}>
-              <td style={{ padding: '8px 12px', color: '#374151', whiteSpace: 'nowrap' }}>{weekLabel(key)}</td>
-              <td style={{ padding: '8px 12px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: ORANGE, fontWeight: 600 }}>{presupuestado ? formatARS(presupuestado) : '—'}</td>
-              <td style={{ padding: '8px 12px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: GREEN, fontWeight: 600 }}>{autorizado ? formatARS(autorizado) : '—'}</td>
+    <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, overflow: 'hidden', marginBottom: 10 }}>
+      <div onClick={() => setOpen(o => !o)}
+        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '13px 16px', cursor: 'pointer', borderBottom: open ? '1px solid #F3F4F6' : 'none', background: open ? '#FAFAFA' : '#fff' }}>
+        {open ? <ChevronDown size={15} color="#9CA3AF" /> : <ChevronRight size={15} color="#9CA3AF" />}
+        <span style={{ fontSize: 14, fontWeight: 700, color: '#111827', minWidth: 150 }}>{ymLabel(mes.ym)}</span>
+        <div style={{ flex: 1 }} />
+        <span style={{ fontSize: 12, color: '#6B7280', marginRight: 6 }}>Presupuestado:</span>
+        <span style={{ fontSize: 14, fontWeight: 700, color: ORANGE, fontVariantNumeric: 'tabular-nums', marginRight: 16 }}>{formatARS(mes.presupuestado)}</span>
+        <span style={{ fontSize: 12, color: '#6B7280', marginRight: 6 }}>Autorizado:</span>
+        <span style={{ fontSize: 14, fontWeight: 700, color: GREEN, fontVariantNumeric: 'tabular-nums' }}>{formatARS(mes.autorizado)}</span>
+      </div>
+      {open && (
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <thead>
+            <tr style={{ background: '#F9FAFB' }}>
+              {['Semana', 'Presupuestado', 'Autorizado'].map(h => (
+                <th key={h} style={{ padding: '8px 12px', textAlign: h === 'Semana' ? 'left' : 'right', fontWeight: 600, color: '#9CA3AF', fontSize: 11, whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
+              ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {mes.weeks.map(({ key, presupuestado, autorizado }) => (
+              <tr key={key} style={{ borderBottom: '1px solid #F3F4F6' }}>
+                <td style={{ padding: '8px 12px', color: '#374151', whiteSpace: 'nowrap' }}>{weekLabel(key)}</td>
+                <td style={{ padding: '8px 12px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: ORANGE, fontWeight: 600 }}>{presupuestado ? formatARS(presupuestado) : '—'}</td>
+                <td style={{ padding: '8px 12px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: GREEN, fontWeight: 600 }}>{autorizado ? formatARS(autorizado) : '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }
@@ -232,8 +309,7 @@ function PresupuestoRow({ p }) {
         <td style={{ padding: '10px 12px', width: 28 }}>
           {open ? <ChevronDown size={14} color="#9CA3AF" /> : <ChevronRight size={14} color="#9CA3AF" />}
         </td>
-        <td style={{ padding: '10px 12px', fontWeight: 500 }}>{toTitleCase(p.paciente)}</td>
-        <td style={{ padding: '10px 12px', color: '#374151' }}>{toTitleCase(p.medico)}</td>
+        <td style={{ padding: '10px 12px', fontWeight: 500 }}>{nombrePar(p)}</td>
         <td style={{ padding: '10px 12px', color: '#374151' }}>{toTitleCase(p.obraSocial)}</td>
         <td style={{ padding: '10px 12px', fontVariantNumeric: 'tabular-nums', fontSize: 12, color: '#9CA3AF', whiteSpace: 'nowrap' }}>{p.fechaCotizacion || '—'}</td>
         <td style={{ padding: '10px 12px', fontVariantNumeric: 'tabular-nums', fontSize: 12, fontWeight: 600, color: '#111827' }}>{formatARS(p.monto)}</td>
@@ -242,7 +318,7 @@ function PresupuestoRow({ p }) {
       {open && (
         <tr style={{ borderBottom: '1px solid #F3F4F6', background: '#F8FAFC' }}>
           <td />
-          <td colSpan={6} style={{ padding: '0 12px 14px' }}>
+          <td colSpan={5} style={{ padding: '0 12px 14px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px 24px', paddingTop: 10 }}>
               {[
                 { label: 'Material', value: p.material || '—' },
@@ -294,7 +370,7 @@ function MesGroup({ ym, rows, defaultOpen }) {
           <thead>
             <tr style={{ background: '#F9FAFB' }}>
               <th style={{ width: 28 }} />
-              {['Paciente', 'Médico', 'Obra Social', 'F. Cotización', 'Monto', 'Estado'].map(h => (
+              {['Paciente - Médico', 'Obra Social', 'F. Cotización', 'Monto', 'Estado'].map(h => (
                 <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: '#9CA3AF', fontSize: 11, whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
               ))}
             </tr>

@@ -494,8 +494,29 @@ function NuevaCirugiaModal({ onClose, onSaved, addToast }) {
 }
 
 /* ── MonthGroup ───────────────────────────────────────────── */
+function realizacionInfo(c) {
+  const d = parseDate(c.fechaCx);
+  if (!d) return { label: 'Sin fecha', bg:'#F3F4F6', color:'#6B7280', border:'#E5E7EB' };
+  const hoy = new Date();
+  hoy.setHours(0,0,0,0);
+  d.setHours(0,0,0,0);
+  if (d < hoy) return { label: 'Realizada', bg:'#ECFDF5', color:'#065F46', border:'#A7F3D0' };
+  if (d.getTime() === hoy.getTime()) return { label: 'Hoy', bg:'#FEF3C7', color:'#92400E', border:'#FCD34D' };
+  return { label: 'Programada', bg:'#EFF6FF', color:'#1D4ED8', border:'#BFDBFE' };
+}
+
 function MonthGroup({ mes, rows, defaultOpen, onSelect }) {
   const [open, setOpen] = useState(defaultOpen);
+  const sorted = useMemo(() => {
+    return [...rows].sort((a, b) => {
+      const da = parseDate(a.fechaCx);
+      const db = parseDate(b.fechaCx);
+      if (!da && !db) return 0;
+      if (!da) return 1;
+      if (!db) return -1;
+      return da - db;
+    });
+  }, [rows]);
   const totalFact = rows.reduce((s,c) => s + parseArgMoney(c.montoFactura), 0);
   const cobradas  = rows.filter(c => c.cobrado).length;
 
@@ -520,13 +541,15 @@ function MonthGroup({ mes, rows, defaultOpen, onSelect }) {
           <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
             <thead>
               <tr style={{ background:'#FAFAFA' }}>
-                {['Paciente','Fecha Cx','Médico','Obra Social','Estado'].map(h => (
+                {['Paciente','Fecha Cx','Realización','Médico','Obra Social','Estado'].map(h => (
                   <th key={h} style={{ padding:'10px 14px', textAlign:'left', fontWeight:600, color:'#9CA3AF', fontSize:11, borderBottom:'1px solid #F3F4F6', whiteSpace:'nowrap', textTransform:'uppercase', letterSpacing:'0.04em' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {rows.map((c,i) => (
+              {sorted.map((c,i) => {
+                const real = realizacionInfo(c);
+                return (
                 <tr key={i} onClick={() => onSelect(c)}
                   style={{ borderBottom:'1px solid #F9FAFB', cursor:'pointer' }}
                   onMouseEnter={e => e.currentTarget.style.background='#F9FAFB'}
@@ -541,6 +564,9 @@ function MonthGroup({ mes, rows, defaultOpen, onSelect }) {
                     )}
                   </td>
                   <td style={{ padding:'13px 14px', color:'#6B7280', whiteSpace:'nowrap', fontSize:12, fontVariantNumeric:'tabular-nums' }}>{c.fechaCx || '—'}</td>
+                  <td style={{ padding:'13px 14px' }}>
+                    <span style={{ fontSize:11, fontWeight:600, padding:'2px 8px', borderRadius:5, background:real.bg, color:real.color, border:`1px solid ${real.border}`, whiteSpace:'nowrap' }}>{real.label}</span>
+                  </td>
                   <td style={{ padding:'13px 14px', color:'#374151' }}>
                     {toTitleCase(c.medico) || '—'}
                     {c.medico && !isMedicoEstandar(c.medico) && (
@@ -551,7 +577,8 @@ function MonthGroup({ mes, rows, defaultOpen, onSelect }) {
                   <td style={{ padding:'13px 14px', color:'#374151' }}>{toTitleCase(c.obraSocial) || '—'}</td>
                   <td style={{ padding:'13px 14px' }}><Badge type={getBadgeType(c)}>{getBadgeLabel(c)}</Badge></td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

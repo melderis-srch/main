@@ -2,7 +2,7 @@
 import { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { parseDate, formatMonthYear } from '../utils/formatters';
-import { CirugiaModal } from './Cirugias';
+import { CirugiaModal, mergeCirugias } from './Cirugias';
 import { addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, format } from 'date-fns';
 
 const DAYS = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa', 'Do'];
@@ -22,7 +22,8 @@ function abbrev(str) {
 }
 
 export default function Calendario({ data, loading, addToast, refetch }) {
-  const { cirugias, ventasCobros } = data;
+  const { ventasCobros } = data;
+  const cirugias = useMemo(() => mergeCirugias(data.cirugias), [data.cirugias]);
   const [current, setCurrent] = useState(new Date());
   const [selected, setSelected] = useState(null);
 
