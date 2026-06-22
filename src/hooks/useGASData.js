@@ -8,6 +8,7 @@ export function useGASData() {
     consolidado: [],
     ventasCobros: [],
     gastosPagos: [],
+    presupuestos: [],
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -16,13 +17,14 @@ export function useGASData() {
     setLoading(true);
     setError(null);
     try {
-      const [cirugias, consolidado, ventasCobros, gastosPagos] = await Promise.all([
+      const [cirugias, consolidado, ventasCobros, gastosPagos, presupuestos] = await Promise.all([
         gasClient.getCirugias(),
         gasClient.getConsolidado(),
         gasClient.getVentasCobros(),
         gasClient.getGastosPagos(),
+        gasClient.getPresupuestos(),
       ]);
-      setData({ cirugias, consolidado, ventasCobros, gastosPagos });
+      setData({ cirugias, consolidado, ventasCobros, gastosPagos, presupuestos });
     } catch (err) {
       setError(err.message);
     } finally {

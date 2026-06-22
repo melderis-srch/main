@@ -13,10 +13,12 @@ import Facturacion from './views/Facturacion';
 import Calendario from './views/Calendario';
 import Pagos from './views/Pagos';
 import Consolidado from './views/Consolidado';
+import Presupuestos from './views/Presupuestos';
 
 const PAGE_TITLES = {
   dashboard: 'Dashboard',
   cirugias: 'Cirugías',
+  presupuestos: 'Presupuestos',
   cobranzas: 'Cobranzas',
   facturacion: 'Facturación',
   calendario: 'Calendario',
@@ -47,6 +49,7 @@ export default function SurcherieApp() {
     switch (page) {
       case 'dashboard':   return <Dashboard {...pageProps} />;
       case 'cirugias':    return <Cirugias {...pageProps} />;
+      case 'presupuestos': return <Presupuestos {...pageProps} />;
       case 'cobranzas':   return <Cobranzas {...pageProps} />;
       case 'facturacion': return <Facturacion {...pageProps} />;
       case 'calendario':  return <Calendario {...pageProps} />;

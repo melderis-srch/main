@@ -4,6 +4,7 @@
 
 var CIRUCIAS_SHEET_ID  = '1ZMNbsQRzzJScaIP2JB7tJmy8cEafVqHuCDgZGOiFq-M';
 var FINANCIERO_SHEET_ID = '1Qy7ylSFMy8-zOCMuGS7B6JUQ8K2BisuDX1WFB5bO-9E';
+var PRESUPUESTOS_SHEET_ID = '1nFTSrRaonn6Mpu_CiBpkKX54c_Dbu_DWWzFlz5tSm5U';
 
 function makeResponse(data) {
   return ContentService.createTextOutput(JSON.stringify(data))
@@ -45,6 +46,7 @@ function doGet(e) {
     else if (action === 'getVentasCobros') result = getVentasCobros();
     else if (action === 'getGastosPagos')  result = getGastosPagos();
     else if (action === 'getSheetNames')   result = getSheetNames();
+    else if (action === 'getPresupuestos') result = getPresupuestos();
     else result = { error: 'Accion no reconocida: ' + action };
     return makeResponse({ success: true, data: result });
   } catch (err) {
@@ -69,6 +71,8 @@ function doPost(e) {
     else if (action === 'updateCobro')     result = updateCobro(data.rowIndex, data.fields);
     else if (action === 'updateGasto')     result = updateGasto(data.rowIndex, data.fields);
     else if (action === 'registrarGasto')  result = registrarGasto(data);
+    else if (action === 'addPresupuesto')    result = addPresupuesto(data);
+    else if (action === 'updatePresupuesto') result = updatePresupuesto(data.rowIndex, data.fields);
     else result = { error: 'Accion no reconocida: ' + action };
     return makeResponse({ success: true, data: result });
   } catch (err) {
@@ -324,6 +328,70 @@ function getGastosPagos() {
 }
 
 // ============================================================
+// READ — Presupuestos
+// Col: A=Paciente B=Médico C=Obra Social D=Material E=Presupuesto(nro)
+//      F=Precio cotización G=Fecha de cotización H=Precio de mejora
+//      I=Estado J=Fecha de autorización K=Condición de pago
+//      L=Realizada M=Fecha de cx N=Observaciones
+// Clasificación:
+//   convertido -> Estado=Autorizada y tiene Fecha de cx
+//   rechazado  -> Estado=PERDIDA o Baja
+//   pendiente  -> el resto (incluye Autorizada sin Fecha de cx todavía)
+// ============================================================
+function getPresupuestos() {
+  var ss    = SpreadsheetApp.openById(PRESUPUESTOS_SHEET_ID);
+  var sheet = findSheet(ss, 'Presupuestos') || ss.getSheets()[0];
+  if (!sheet) throw new Error('No se encontró la hoja de Presupuestos. Hojas disponibles: ' +
+    ss.getSheets().map(function(s){return s.getName();}).join(', '));
+  var data = sheet.getDataRange().getValues();
+  var rows = [];
+  for (var i = 1; i < data.length; i++) {
+    var r = data[i];
+    if (!r[0] && !r[1]) continue;
+    if (String(r[0]).toLowerCase() === 'paciente') continue;
+
+    var estadoRaw   = String(r[8] || '').trim();
+    var estadoNorm  = estadoRaw.toUpperCase();
+    var fechaCxRaw  = r[12];
+    var tieneFechaCx = !!fechaCxRaw;
+
+    var clasificacion;
+    if (estadoNorm === 'PERDIDA' || estadoNorm === 'BAJA') {
+      clasificacion = 'rechazado';
+    } else if (estadoNorm === 'AUTORIZADA' && tieneFechaCx) {
+      clasificacion = 'convertido';
+    } else {
+      clasificacion = 'pendiente';
+    }
+
+    var precioCotizacion = Number(r[5]) || 0;
+    var precioMejora     = Number(r[7]) || 0;
+    var monto = precioCotizacion + precioMejora;
+
+    rows.push({
+      rowIndex:             i + 1,
+      paciente:             r[0]  || '',
+      medico:               r[1]  || '',
+      obraSocial:           r[2]  || '',
+      material:             r[3]  || '',
+      numeroPresupuesto:    String(r[4] || ''),
+      precioCotizacion:     precioCotizacion,
+      fechaCotizacion:      formatFecha(r[6]),
+      precioMejora:         precioMejora,
+      monto:                monto,
+      estado:               estadoRaw,
+      fechaAutorizacion:    formatFecha(r[9]),
+      condicionPago:        r[10] || '',
+      realizada:            r[11] === true || String(r[11]).toUpperCase() === 'TRUE',
+      fechaCx:              formatFecha(fechaCxRaw),
+      observaciones:        r[13] || '',
+      clasificacion:        clasificacion
+    });
+  }
+  return rows;
+}
+
+// ============================================================
 // WRITE
 // ============================================================
 function updateCobrado(rowIndex, fechaCobro) {
@@ -439,4 +507,32 @@ function registrarGasto(data) {
     data.comprobanteEnviado||'', data.fechaPagoEcheq||'', false
   ]);
   return { appended: true };
+}
+
+function addPresupuesto(data) {
+  var ss    = SpreadsheetApp.openById(PRESUPUESTOS_SHEET_ID);
+  var sheet = findSheet(ss, 'Presupuestos') || ss.getSheets()[0];
+  if (!sheet) throw new Error('Hoja Presupuestos no encontrada');
+  sheet.appendRow([
+    data.paciente||'', data.medico||'', data.obraSocial||'', data.material||'',
+    data.numeroPresupuesto||'', data.precioCotizacion||'', data.fechaCotizacion||'',
+    data.precioMejora||'', data.estado||'', data.fechaAutorizacion||'',
+    data.condicionPago||'', false, data.fechaCx||'', data.observaciones||''
+  ]);
+  return { appended: true };
+}
+
+function updatePresupuesto(rowIndex, fields) {
+  var ss = SpreadsheetApp.openById(PRESUPUESTOS_SHEET_ID);
+  var sheet = findSheet(ss, 'Presupuestos') || ss.getSheets()[0];
+  if (!sheet) throw new Error('Hoja Presupuestos no encontrada');
+  var colMap = {
+    paciente:1, medico:2, obraSocial:3, material:4, numeroPresupuesto:5,
+    precioCotizacion:6, fechaCotizacion:7, precioMejora:8, estado:9,
+    fechaAutorizacion:10, condicionPago:11, realizada:12, fechaCx:13, observaciones:14
+  };
+  for (var key in fields) {
+    if (colMap[key] !== undefined) sheet.getRange(rowIndex, colMap[key]).setValue(fields[key]);
+  }
+  return { updated: rowIndex };
 }

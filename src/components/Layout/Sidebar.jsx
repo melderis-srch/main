@@ -1,11 +1,12 @@
 'use client';
-import { LayoutDashboard, Stethoscope, CreditCard, Calendar, Receipt, BarChart2, FileText } from 'lucide-react';
+import { LayoutDashboard, Stethoscope, CreditCard, Calendar, Receipt, BarChart2, FileText, ClipboardList } from 'lucide-react';
 
 const ORANGE = '#C05621';
 
 const NAV = [
   { id: 'dashboard',   label: 'Dashboard',          Icon: LayoutDashboard },
   { id: 'cirugias',    label: 'Cirugías',            Icon: Stethoscope     },
+  { id: 'presupuestos', label: 'Presupuestos',       Icon: ClipboardList   },
   { id: 'cobranzas',   label: 'Cobranzas',           Icon: CreditCard      },
   { id: 'facturacion', label: 'Facturación',         Icon: FileText        },
   { id: 'calendario',  label: 'Calendario',          Icon: Calendar        },

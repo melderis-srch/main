@@ -30,6 +30,7 @@ export const gasClient = {
   getConsolidado: () => gasGet('getConsolidado'),
   getVentasCobros: () => gasGet('getVentasCobros'),
   getGastosPagos: () => gasGet('getGastosPagos'),
+  getPresupuestos: () => gasGet('getPresupuestos'),
 
   updateCobrado: (rowIndex, fechaCobro) =>
     gasPost('updateCobrado', { rowIndex, fechaCobro }),
@@ -47,4 +48,7 @@ export const gasClient = {
   updateCobro: (rowIndex, fields) => gasPost('updateCobro', { rowIndex, fields }),
   updateGasto: (rowIndex, fields) => gasPost('updateGasto', { rowIndex, fields }),
   registrarGasto: (data) => gasPost('registrarGasto', data),
+
+  addPresupuesto: (data) => gasPost('addPresupuesto', data),
+  updatePresupuesto: (rowIndex, fields) => gasPost('updatePresupuesto', { rowIndex, fields }),
 };
