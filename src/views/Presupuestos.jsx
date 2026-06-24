@@ -223,78 +223,86 @@ function SemanalMesGroup({ mes, defaultOpen }) {
   );
 }
 
-/* ── Tab: Resumen mensual (pivot tipo Sheet) ────────────────
-   Filas:
-   - Presupuesto: monto cotizado, por mes de Fecha de cotización
-   - Autorizado: monto autorizado, por mes de Fecha de autorización
-   - Cirugías realizadas: monto realizado, por mes de Fecha de cx
-   - Autorizado con fecha sin realizarse: autorizado + fecha de cx, sin realizar, por mes de Fecha de cx
-   - Autorizaciones del mes sin fecha: autorizado sin fecha de cx, por mes de Fecha de autorización
+/* ── Tab: Resumen mensual (cohortes por mes de cotización) ───
+   Cada presupuesto se ubica en el mes de su Fecha de cotización.
+   Por mes se muestra: total presupuestado, % de conversión
+   (convertidos / (convertidos + rechazados) del mes), y el detalle
+   en plata de lo autorizado-sin-fecha y lo cotizado-sin-respuesta.
 ============================================================ */
 function MensualTab({ presupuestos }) {
-  const { months, rows } = useMemo(() => {
-    const monthSet = new Set();
-    const presupuestoPorMes = {};
-    const autorizadoPorMes = {};
-    const realizadoPorMes = {};
-    const autorizadoSinRealizarPorMes = {};
-    const autorizacionesSinFechaPorMes = {};
-
-    const add = (map, ym, monto) => { map[ym] = (map[ym] || 0) + monto; monthSet.add(ym); };
-
+  const meses = useMemo(() => {
+    const byMonth = {};
     presupuestos.forEach(p => {
-      const dCot = parseDate(p.fechaCotizacion);
-      if (dCot) add(presupuestoPorMes, format(dCot, 'yyyy-MM'), p.monto);
-
-      const dAut = parseDate(p.fechaAutorizacion);
-      const esAutorizada = p.estado === 'Autorizada';
-      if (dAut && esAutorizada) add(autorizadoPorMes, format(dAut, 'yyyy-MM'), p.monto);
-
-      const dCx = parseDate(p.fechaCx);
-      if (dCx && p.realizada) add(realizadoPorMes, format(dCx, 'yyyy-MM'), p.monto);
-      if (dCx && esAutorizada && !p.realizada) add(autorizadoSinRealizarPorMes, format(dCx, 'yyyy-MM'), p.monto);
-      if (!dCx && esAutorizada && dAut) add(autorizacionesSinFechaPorMes, format(dAut, 'yyyy-MM'), p.monto);
+      const d = parseDate(p.fechaCotizacion);
+      const ym = d ? format(d, 'yyyy-MM') : 'sin-fecha';
+      if (!byMonth[ym]) byMonth[ym] = [];
+      byMonth[ym].push(p);
     });
 
-    const monthsSorted = Array.from(monthSet).sort().reverse();
-    const rows = [
-      { label: 'Presupuesto',                          color: ORANGE, map: presupuestoPorMes },
-      { label: 'Autorizado',                            color: GREEN,  map: autorizadoPorMes },
-      { label: 'Cirugías realizadas',                   color: BLUE,   map: realizadoPorMes },
-      { label: 'Autorizado con fecha sin realizarse',   color: AMBER,  map: autorizadoSinRealizarPorMes },
-      { label: 'Autorizaciones del mes sin fecha',      color: RED,    map: autorizacionesSinFechaPorMes },
-    ];
-    return { months: monthsSorted, rows };
+    return Object.keys(byMonth).sort().reverse().map(ym => {
+      const rows = byMonth[ym];
+      const totalPresupuestado = rows.reduce((s, p) => s + p.monto, 0);
+
+      const convertidos = rows.filter(p => p.clasificacion === 'convertido');
+      const rechazados  = rows.filter(p => p.clasificacion === 'rechazado');
+      const autorizadosSinFecha = rows.filter(p => p.clasificacion === 'pendiente' && String(p.estado || '').trim().toUpperCase() === 'AUTORIZADA');
+      const cotizadosSinRespuesta = rows.filter(p => p.clasificacion === 'pendiente' && String(p.estado || '').trim().toUpperCase() !== 'AUTORIZADA');
+
+      const montoConvertido = convertidos.reduce((s, p) => s + p.monto, 0);
+      const montoRechazado = rechazados.reduce((s, p) => s + p.monto, 0);
+      const montoAutorizadoSinFecha = autorizadosSinFecha.reduce((s, p) => s + p.monto, 0);
+      const montoCotizadoSinRespuesta = cotizadosSinRespuesta.reduce((s, p) => s + p.monto, 0);
+
+      const decididos = convertidos.length + rechazados.length;
+      const tasaConversion = decididos > 0 ? (convertidos.length / decididos) * 100 : null;
+
+      return {
+        ym, totalPresupuestado, tasaConversion,
+        convertidos: convertidos.length, montoConvertido,
+        rechazados: rechazados.length, montoRechazado,
+        autorizadosSinFecha: autorizadosSinFecha.length, montoAutorizadoSinFecha,
+        cotizadosSinRespuesta: cotizadosSinRespuesta.length, montoCotizadoSinRespuesta,
+      };
+    });
   }, [presupuestos]);
 
-  if (months.length === 0) {
+  if (meses.length === 0) {
     return <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 40, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>Sin datos</div>;
   }
 
   return (
-    <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, overflow: 'auto' }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: 800 }}>
-        <thead>
-          <tr style={{ background: '#F9FAFB' }}>
-            <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: '#9CA3AF', fontSize: 11, whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', left: 0, background: '#F9FAFB' }}>Métrica</th>
-            {months.map(m => (
-              <th key={m} style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, color: '#9CA3AF', fontSize: 11, whiteSpace: 'nowrap' }}>{ymLabel(m)}</th>
+    <div>
+      {meses.map(m => (
+        <div key={m.ym} style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, overflow: 'hidden', marginBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', borderBottom: '1px solid #F3F4F6', background: '#FAFAFA' }}>
+            <span style={{ fontSize: 15, fontWeight: 700, color: '#111827', minWidth: 150 }}>{ymLabel(m.ym)}</span>
+            <div style={{ flex: 1 }} />
+            <span style={{ fontSize: 12, color: '#6B7280' }}>Presupuestado:</span>
+            <span style={{ fontSize: 15, fontWeight: 700, color: ORANGE, fontVariantNumeric: 'tabular-nums' }}>{formatARS(m.totalPresupuestado)}</span>
+            <span style={{
+              fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
+              background: m.tasaConversion === null ? '#F3F4F6' : m.tasaConversion >= 50 ? '#ECFDF5' : '#FEF2F2',
+              color: m.tasaConversion === null ? '#9CA3AF' : m.tasaConversion >= 50 ? '#065F46' : '#991B1B',
+            }}>
+              {m.tasaConversion === null ? 'Sin decisión aún' : `${m.tasaConversion.toFixed(0)}% conversión`}
+            </span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 0 }}>
+            {[
+              { label: 'Convertido',                       count: m.convertidos,            monto: m.montoConvertido,            color: GREEN },
+              { label: 'Autorizado, sin fecha',             count: m.autorizadosSinFecha,     monto: m.montoAutorizadoSinFecha,    color: BLUE },
+              { label: 'Cotizado, sin respuesta',           count: m.cotizadosSinRespuesta,   monto: m.montoCotizadoSinRespuesta,  color: AMBER },
+              { label: 'Rechazado',                         count: m.rechazados,              monto: m.montoRechazado,             color: RED },
+            ].map((b, i) => (
+              <div key={b.label} style={{ padding: '12px 18px', borderLeft: i > 0 ? '1px solid #F3F4F6' : 'none', borderTop: '1px solid #F3F4F6' }}>
+                <div style={{ fontSize: 11, color: '#9CA3AF', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>{b.label}</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: b.monto ? b.color : '#D1D5DB', fontVariantNumeric: 'tabular-nums' }}>{b.monto ? formatARS(b.monto) : '—'}</div>
+                <div style={{ fontSize: 11.5, color: '#9CA3AF', marginTop: 2 }}>{b.count} presupuesto{b.count !== 1 ? 's' : ''}</div>
+              </div>
             ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map(({ label, color, map }) => (
-            <tr key={label} style={{ borderBottom: '1px solid #F3F4F6' }}>
-              <td style={{ padding: '8px 12px', color: '#374151', fontWeight: 600, whiteSpace: 'nowrap', position: 'sticky', left: 0, background: '#fff' }}>{label}</td>
-              {months.map(m => (
-                <td key={m} style={{ padding: '8px 12px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: map[m] ? color : '#D1D5DB' }}>
-                  {map[m] ? formatARS(map[m]) : '—'}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
