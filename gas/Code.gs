@@ -83,6 +83,34 @@ function doPost(e) {
 // ============================================================
 // HELPERS
 // ============================================================
+var MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+  'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+function mesLabel(date) {
+  return MESES_ES[date.getMonth()] + ' ' + date.getFullYear();
+}
+
+function normalizeNombre(s) {
+  return String(s || '').toLowerCase()
+    .replace(/[áàâä]/g,'a').replace(/[éèêë]/g,'e')
+    .replace(/[íìîï]/g,'i').replace(/[óòôö]/g,'o')
+    .replace(/[úùûü]/g,'u')
+    .replace(/[^a-z0-9]/g,' ').replace(/\s+/g,' ').trim();
+}
+
+// Parsea dd/MM/yyyy (o ya Date) a objeto Date
+function parseFechaFlexible(val) {
+  if (!val) return null;
+  if (val instanceof Date) return val;
+  var parts = String(val).trim().split('/');
+  if (parts.length !== 3) {
+    var d = new Date(val);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  var d2 = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+  return isNaN(d2.getTime()) ? null : d2;
+}
+
 function formatFecha(val) {
   if (!val) return '';
   try {
@@ -426,6 +454,7 @@ function addCirugia(data) {
     data.numeroFactura||'', data.montoFactura||'', data.fechaFactura||'',
     data.fechaCobro||'', false, data.retencionesOtros||'', '', '', ''
   ]);
+  if (data.fechaCx) crearCobranzaPendiente(data.paciente, data.obraSocial);
   return { appended: true };
 }
 
@@ -461,6 +490,10 @@ function updateCirugia(rowIndex, fields) {
   };
   for (var key in fields) {
     if (colMap[key] !== undefined) sheet.getRange(rowIndex, colMap[key]).setValue(fields[key]);
+  }
+  if (fields.fechaCx) {
+    var row = sheet.getRange(rowIndex, 1, 1, 6).getValues()[0];
+    crearCobranzaPendiente(row[0], row[5]);
   }
   return { updated: rowIndex };
 }
@@ -519,6 +552,11 @@ function addPresupuesto(data) {
     data.precioMejora||'', data.estado||'', data.fechaAutorizacion||'',
     data.condicionPago||'', false, data.fechaCx||'', data.observaciones||''
   ]);
+  sincronizarCirugiaDesdePresupuesto({
+    paciente: data.paciente, medico: data.medico, obraSocial: data.obraSocial,
+    estado: data.estado, fechaCx: data.fechaCx,
+    monto: (Number(data.precioCotizacion) || 0) + (Number(data.precioMejora) || 0)
+  });
   return { appended: true };
 }
 
@@ -534,5 +572,120 @@ function updatePresupuesto(rowIndex, fields) {
   for (var key in fields) {
     if (colMap[key] !== undefined) sheet.getRange(rowIndex, colMap[key]).setValue(fields[key]);
   }
+
+  // Si esta edición autoriza y/o agenda fecha de cirugía, sincroniza con Cirugías/Cobranza
+  var row = sheet.getRange(rowIndex, 1, 1, 14).getValues()[0];
+  sincronizarCirugiaDesdePresupuesto({
+    paciente: row[0], medico: row[1], obraSocial: row[2],
+    estado: row[8], fechaCx: row[12] ? formatFecha(row[12]) : '',
+    monto: (Number(row[5]) || 0) + (Number(row[7]) || 0)
+  });
+
   return { updated: rowIndex };
+}
+
+// ============================================================
+// SINCRONIZACIÓN — Presupuesto autorizado y con fecha → Cirugías → Cobranza
+// Cuando un presupuesto queda "Autorizada" con Fecha de cx cargada,
+// se crea (si no existe ya) la fila correspondiente en Cirugías,
+// y al crearse la cirugía se crea (si no existe) el item pendiente
+// en VENTASCOBROS para que aparezca en Cobranza/Facturación.
+// Es best-effort: matchea por nombre de paciente normalizado, así
+// que typos importantes pueden generar una fila nueva en vez de
+// reusar la existente — se puede unificar a mano desde la app.
+// ============================================================
+function sincronizarCirugiaDesdePresupuesto(p) {
+  var estadoNorm = String(p.estado || '').trim().toUpperCase();
+  if (estadoNorm !== 'AUTORIZADA' || !p.fechaCx) return;
+
+  var ss    = SpreadsheetApp.openById(CIRUCIAS_SHEET_ID);
+  var sheet = findSheet(ss, 'Cirugías');
+  if (!sheet) return;
+
+  var pacienteNorm = normalizeNombre(p.paciente);
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (normalizeNombre(data[i][0]) === pacienteNorm && formatFecha(data[i][2]) === p.fechaCx) {
+      return; // ya existe esta cirugía cargada
+    }
+  }
+
+  var fechaCxDate = parseFechaFlexible(p.fechaCx);
+  var mes = fechaCxDate ? mesLabel(fechaCxDate) : '';
+
+  sheet.appendRow([
+    p.paciente || '', p.medico || '', p.fechaCx || '', mes,
+    '', p.obraSocial || '', '', '', '', '', '', '', p.monto || '',
+    '', '', '', '', false, '', '', '', ''
+  ]);
+
+  crearCobranzaPendiente(p.paciente, p.obraSocial);
+}
+
+// Crea un item "pendiente" en VENTASCOBROS para que la cirugía
+// recién agendada ya aparezca en Cobranza/Facturación, listo para
+// completar con el consumo, número de factura y monto cuando salgan.
+function crearCobranzaPendiente(paciente, obraSocial) {
+  var ss    = SpreadsheetApp.openById(FINANCIERO_SHEET_ID);
+  var sheet = findSheet(ss, 'VENTASCOBROS');
+  if (!sheet) return;
+
+  var pacienteNorm = normalizeNombre(paciente);
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    var mismoNombre = normalizeNombre(data[i][0]) === pacienteNorm;
+    var sinFacturarAun = !data[i][2] && !data[i][8]; // sin nro factura y sin monto cobrado
+    if (mismoNombre && sinFacturarAun) return; // ya hay un item pendiente para este paciente
+  }
+
+  sheet.appendRow([
+    paciente || '', obraSocial || '', '', '', '',
+    '', '', '', '', '', '', '', '', '', '', '', '', ''
+  ]);
+}
+
+// ============================================================
+// TRIGGER — Edición manual en la hoja de Presupuestos
+// Permite que la sincronización (crear Cirugía + ítem en Cobranza)
+// corra también cuando alguien edita la planilla directamente,
+// sin pasar por la app. Es un trigger INSTALABLE (no simple onEdit)
+// porque necesita abrir las otras dos planillas (Cirugías y
+// Financiero), algo que un trigger simple no tiene permiso de hacer.
+//
+// Para activarlo una sola vez: abrir el editor de Apps Script de la
+// planilla de Presupuestos, seleccionar la función
+// "crearTriggerEdicionPresupuestos" en el desplegable de funciones,
+// y darle Run (va a pedir autorización la primera vez).
+// ============================================================
+function crearTriggerEdicionPresupuestos() {
+  var ss = SpreadsheetApp.openById(PRESUPUESTOS_SHEET_ID);
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'onEditPresupuestos') {
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+  ScriptApp.newTrigger('onEditPresupuestos')
+    .forSpreadsheet(ss)
+    .onEdit()
+    .create();
+}
+
+function onEditPresupuestos(e) {
+  if (!e || !e.range) return;
+  var editedSheet = e.range.getSheet();
+  var presupuestosSheet = findSheet(e.source, 'Presupuestos') || e.source.getSheets()[0];
+  if (editedSheet.getSheetId() !== presupuestosSheet.getSheetId()) return;
+
+  var firstRow = e.range.getRow();
+  var lastRow  = firstRow + e.range.getNumRows() - 1;
+  for (var row = Math.max(firstRow, 2); row <= lastRow; row++) {
+    var data = editedSheet.getRange(row, 1, 1, 14).getValues()[0];
+    if (!data[0]) continue; // fila vacía
+    sincronizarCirugiaDesdePresupuesto({
+      paciente: data[0], medico: data[1], obraSocial: data[2],
+      estado: data[8], fechaCx: data[12] ? formatFecha(data[12]) : '',
+      monto: (Number(data[5]) || 0) + (Number(data[7]) || 0)
+    });
+  }
 }
