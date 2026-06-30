@@ -1,12 +1,13 @@
 'use client';
 import { useState, useMemo } from 'react';
-import { Plus, Pencil, ChevronDown, ChevronRight, FileText } from 'lucide-react';
+import { Plus, Pencil, ChevronDown, ChevronRight, FileText, Receipt } from 'lucide-react';
 import { Badge } from '../components/UI/Badge';
 import { Modal } from '../components/UI/Modal';
 import { KPICard } from '../components/UI/KPICard';
 import { SkeletonTable, SkeletonKPI } from '../components/UI/Skeleton';
 import { parseArgMoney, formatARS, parseDate, toTitleCase } from '../utils/formatters';
 import { gasClient } from '../utils/gasClient';
+import { abrirRecibo } from '../utils/recibos';
 import { mergeCirugias } from './Cirugias';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -77,13 +78,20 @@ function FacturaForm({ initial, title, onSubmit, onClose }) {
 }
 
 /* ── Fila expandible ────────────────────────────────────── */
-function FacturaRow({ v, cirugiaMatch, sortBy, onEdit }) {
+function FacturaRow({ v, cirugiaMatch, sortBy, onEdit, addToast }) {
   const [open, setOpen] = useState(false);
   const cobrado = !!v.fechaCobroReal;
 
   const presupuesto = cirugiaMatch ? parseArgMoney(cirugiaMatch.montoPresupuesto) : null;
   const facturado = parseArgMoney(v.montoFacturado);
   const diff = presupuesto !== null ? facturado - presupuesto : null;
+
+  const handleRecibo = (e) => {
+    e.stopPropagation();
+    if (!abrirRecibo(v.nroFactura)) {
+      addToast('Falta configurar la URL de recibos (NEXT_PUBLIC_RECIBOS_URL).', 'error');
+    }
+  };
 
   return (
     <>
@@ -99,7 +107,17 @@ function FacturaRow({ v, cirugiaMatch, sortBy, onEdit }) {
         <td style={{ padding: '10px 12px', fontVariantNumeric: 'tabular-nums', fontSize: 12, color: sortBy === 'entrega' ? '#111827' : '#9CA3AF', fontWeight: sortBy === 'entrega' ? 600 : 400, whiteSpace: 'nowrap' }}>{v.fechaEntrega || '—'}</td>
         <td style={{ padding: '10px 12px', fontVariantNumeric: 'tabular-nums', fontSize: 13, fontWeight: 600, color: '#111827' }}>{formatARS(facturado)}</td>
         <td style={{ padding: '10px 12px' }}>{cobrado ? <Badge type="cobrado">Cobrado</Badge> : <Badge type="pendiente">Pendiente</Badge>}</td>
-        <td style={{ padding: '10px 12px' }}>{v.notas ? <FileText size={13} color={ORANGE} /> : null}</td>
+        <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
+          {v.notas ? <FileText size={13} color={ORANGE} style={{ verticalAlign: 'middle', marginRight: 8 }} /> : null}
+          {v.nroFactura ? (
+            <button onClick={handleRecibo} title="Generar recibo de cobranza"
+              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 4, background: 'none', border: 'none', borderRadius: 6, cursor: 'pointer', color: '#9CA3AF', verticalAlign: 'middle' }}
+              onMouseEnter={e => { e.currentTarget.style.color = ORANGE; e.currentTarget.style.background = '#FFF7F3'; }}
+              onMouseLeave={e => { e.currentTarget.style.color = '#9CA3AF'; e.currentTarget.style.background = 'none'; }}>
+              <Receipt size={15} />
+            </button>
+          ) : null}
+        </td>
       </tr>
 
       {open && (
@@ -125,11 +143,17 @@ function FacturaRow({ v, cirugiaMatch, sortBy, onEdit }) {
                 <div style={{ fontSize: 13, color: '#374151', whiteSpace: 'pre-wrap' }}>{v.notas}</div>
               </div>
             )}
-            <div style={{ marginTop: 10 }}>
+            <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
               <button onClick={e => { e.stopPropagation(); onEdit(v); }}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 12px', background: 'none', border: '1px solid #E5E7EB', borderRadius: 6, cursor: 'pointer', color: '#6B7280', fontSize: 12, fontFamily: 'inherit' }}>
                 <Pencil size={12} /> Editar factura
               </button>
+              {v.nroFactura ? (
+                <button onClick={handleRecibo}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 12px', background: ORANGE, border: '1px solid ' + ORANGE, borderRadius: 6, cursor: 'pointer', color: '#fff', fontSize: 12, fontWeight: 600, fontFamily: 'inherit' }}>
+                  <Receipt size={12} /> Generar recibo
+                </button>
+              ) : null}
             </div>
           </td>
         </tr>
@@ -139,7 +163,7 @@ function FacturaRow({ v, cirugiaMatch, sortBy, onEdit }) {
 }
 
 /* ── Grupo por mes ──────────────────────────────────────── */
-function FacturasDelMes({ ym, rows, defaultOpen, cirugiasByName, sortBy, onEdit }) {
+function FacturasDelMes({ ym, rows, defaultOpen, cirugiasByName, sortBy, onEdit, addToast }) {
   const [open, setOpen] = useState(defaultOpen);
   const total = rows.reduce((s, v) => s + parseArgMoney(v.montoFacturado), 0);
   const cobradas = rows.filter(v => v.fechaCobroReal).length;
@@ -179,7 +203,7 @@ function FacturasDelMes({ ym, rows, defaultOpen, cirugiasByName, sortBy, onEdit 
           </thead>
           <tbody>
             {sorted.map((v, i) => (
-              <FacturaRow key={i} v={v} cirugiaMatch={cirugiasByName.get(normName(v.paciente))} sortBy={sortBy} onEdit={onEdit} />
+              <FacturaRow key={i} v={v} cirugiaMatch={cirugiasByName.get(normName(v.paciente))} sortBy={sortBy} onEdit={onEdit} addToast={addToast} />
             ))}
           </tbody>
         </table>
@@ -319,7 +343,7 @@ export default function Facturacion({ data, loading, refetch, addToast }) {
         porMes.length === 0
           ? <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 40, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>Sin facturas registradas</div>
           : porMes.map(({ ym, rows }) => (
-              <FacturasDelMes key={ym} ym={ym} rows={rows} defaultOpen={ym === currentYM || !!selectedMonth} cirugiasByName={cirugiasByName} sortBy={sortBy} onEdit={setEditing} />
+              <FacturasDelMes key={ym} ym={ym} rows={rows} defaultOpen={ym === currentYM || !!selectedMonth} cirugiasByName={cirugiasByName} sortBy={sortBy} onEdit={setEditing} addToast={addToast} />
             ))
       )}
 
