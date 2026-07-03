@@ -6,7 +6,9 @@ import { Modal } from '../components/UI/Modal';
 import { KPICard } from '../components/UI/KPICard';
 import { SkeletonTable, SkeletonKPI } from '../components/UI/Skeleton';
 import { parseArgMoney, formatARS, parseDate, daysDiff, toTitleCase } from '../utils/formatters';
-import { gasClient } from '../utils/gasClient';
+import { gasV2 } from '../utils/gasClientV2';
+import { useMasterData } from '../hooks/useMasterData';
+import { buildCobranzaRows } from '../utils/casoSelectors';
 import { TrendingUp, Clock, CalendarClock, ArrowDownUp } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -424,8 +426,12 @@ const TABS = [
 ];
 
 /* ── Componente principal ───────────────────────────────── */
-export default function Cobranzas({ data, loading, refetch, addToast }) {
-  const { ventasCobros } = data;
+export default function Cobranzas({ addToast }) {
+  // Vista migrada al modelo v2 (planilla maestra). Se auto-abastece de datos
+  // vía useMasterData y arma las filas uniendo casos + facturas + cobros.
+  const master = useMasterData();
+  const { loading, refetch } = master;
+  const ventasCobros = useMemo(() => buildCobranzaRows(master.data), [master.data]);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [tab, setTab] = useState('cobros');
@@ -514,7 +520,23 @@ export default function Cobranzas({ data, loading, refetch, addToast }) {
 
   const handleEdit = async (form) => {
     try {
-      await gasClient.updateCobro(editing.rowIndex, form);
+      // Los campos de la factura y del cobro viven en hojas distintas: se rutea
+      // cada grupo a su endpoint. (Los montos/retenciones son agregados del caso;
+      // para el caso común 1 factura + 1 cobro coincide con el registro real.)
+      const facturaFields = {
+        numeroFactura: form.nroFactura, montoFacturado: form.montoFacturado,
+        fechaFactura: form.fechaFactura, fechaEntrega: form.fechaEntrega, notas: form.notas,
+      };
+      const cobroFields = {
+        retGanancias: form.retGanancias, retIIBB: form.retIIBB, retSuss: form.retSuss,
+        retSellados: form.retSellados, montoCobrado: form.montoCobrado, medioPago: form.medioPago,
+        lugarPago: form.lugarPago, condicionPago: form.condicionPago,
+        fechaCobroEsperada: form.fechaCobroEsperada, fechaCobroReal: form.fechaCobroReal,
+        fechaCobroCheque: form.fechaCobroCheque, notas: form.notas,
+      };
+      if (editing._facturaRow) await gasV2.updateFactura(editing._facturaRow, facturaFields);
+      if (editing._cobroRow) await gasV2.updateCobro(editing._cobroRow, cobroFields);
+      else if (editing._casoId) await gasV2.addCobro({ casoId: editing._casoId, ...cobroFields });
       addToast('Cobro actualizado', 'success');
       refetch();
       setEditing(null);
@@ -524,7 +546,7 @@ export default function Cobranzas({ data, loading, refetch, addToast }) {
   const handleRegister = async (form) => {
     if (!form.nroFactura) { addToast('N° de factura requerido', 'error'); return; }
     try {
-      await gasClient.registrarCobro(form);
+      await gasV2.registrarCobroCompleto(form);
       addToast('Cobro registrado', 'success');
       refetch();
       setShowModal(false);

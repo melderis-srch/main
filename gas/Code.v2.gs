@@ -79,6 +79,7 @@ function doPost(e) {
       case 'updateFactura':     result = updateFactura(data.rowIndex, data.fields); break;
       case 'addCobro':          result = addCobro(data); break;
       case 'updateCobro':       result = updateCobro(data.rowIndex, data.fields); break;
+      case 'registrarCobroCompleto': result = registrarCobroCompleto(data); break;
       case 'addPago':           result = addPago(data); break;
       case 'updatePago':        result = updatePago(data.rowIndex, data.fields); break;
       case 'addOrden':          result = addOrden(data); break;
@@ -586,6 +587,41 @@ function addCobro(data) {
   return { cobroId: cobroId };
 }
 function updateCobro(rowIndex, fields) { writeFields(SHEETS.cobros, rowIndex, fields); return { updated: rowIndex }; }
+
+// Registrar cobro "completo" desde un formulario plano (como el viejo registrarCobro):
+// crea un caso provisional (sin fechaCx), su factura y su cobro, todo enlazado.
+// Reusa el caso si ya existe una factura con ese Nº.
+function registrarCobroCompleto(data) {
+  var casoId = '';
+  var nf = String(data.nroFactura || '').trim();
+  if (nf) {
+    var fac = readSheet(SHEETS.facturas).rows.filter(function (f) {
+      return String(f.numeroFactura || '').trim() === nf; })[0];
+    if (fac) casoId = fac.casoId;
+  }
+  if (!casoId) {
+    casoId = nextCasoId();
+    appendObject(SHEETS.casos, {
+      casoId: casoId, paciente: data.paciente || '', obraSocial: data.obraSocial || '',
+      creadoEl: new Date(), actualizadoEl: new Date()
+    });
+    if (nf || data.montoFacturado) {
+      appendObject(SHEETS.facturas, {
+        casoId: casoId, numeroFactura: data.nroFactura || '',
+        montoFacturado: requireMoney('monto facturado', data.montoFacturado),
+        fechaFactura: data.fechaFactura || '', fechaEntrega: data.fechaEntrega || '', notas: data.notas || ''
+      });
+    }
+  }
+  var res = addCobro({
+    casoId: casoId, montoCobrado: data.montoCobrado, retGanancias: data.retGanancias,
+    retIIBB: data.retIIBB, retSuss: data.retSuss, retSellados: data.retSellados,
+    medioPago: data.medioPago, lugarPago: data.lugarPago, condicionPago: data.condicionPago,
+    fechaCobroEsperada: data.fechaCobroEsperada, fechaCobroReal: data.fechaCobroReal,
+    fechaCobroCheque: data.fechaCobroCheque, notas: data.notas
+  });
+  return { casoId: casoId, cobroId: res.cobroId };
+}
 
 // ============================================================
 // WRITE — Pagos y Órdenes de compra
