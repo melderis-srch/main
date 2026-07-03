@@ -555,6 +555,16 @@ export default function Cobranzas({ addToast }) {
 
   return (
     <div>
+      {/* Banner de error de carga (backend v2 / planilla maestra) */}
+      {master.error && (
+        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#991B1B', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 13 }}>
+          <strong>No se pudo cargar la planilla maestra.</strong> {master.error}
+          <div style={{ marginTop: 4, color: '#B91C1C', fontSize: 12 }}>
+            Revisá que el backend v2 esté desplegado como Web App con acceso "Cualquier persona" y que la URL sea la correcta.
+          </div>
+        </div>
+      )}
+
       {/* Selector de mes + botón */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
