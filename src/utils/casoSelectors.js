@@ -52,7 +52,10 @@ export function buildCobranzaRows(master) {
       fechaFactura:   isoToDMY(f.fechaFactura),
       fechaEntrega:   isoToDMY(f.fechaEntrega),
 
-      // retenciones y cobro: agregados de los cobros del caso
+      // condición y fecha ESPERADA son de la factura (propiedad de la factura)
+      condicionPago:      f.condicionPago || '',
+      fechaCobroEsperada: isoToDMY(f.fechaCobroEsperada),
+      // retenciones y cobro real: agregados de los cobros del caso
       retGanancias: sum(cobros, 'retGanancias'),
       retIIBB:      sum(cobros, 'retIIBB'),
       retSuss:      sum(cobros, 'retSuss'),
@@ -60,8 +63,6 @@ export function buildCobranzaRows(master) {
       montoCobrado: sum(cobros, 'montoCobrado'),
       medioPago:     primary.medioPago || '',
       lugarPago:     primary.lugarPago || '',
-      condicionPago: primary.condicionPago || '',
-      fechaCobroEsperada: isoToDMY(primary.fechaCobroEsperada),
       fechaCobroReal:     isoToDMY(ultimoReal ? ultimoReal.fechaCobroReal : ''),
       fechaCobroCheque:   isoToDMY(primary.fechaCobroCheque),
       notas: f.notas || primary.notas || '',

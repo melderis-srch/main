@@ -525,13 +525,13 @@ export default function Cobranzas({ addToast }) {
       // para el caso común 1 factura + 1 cobro coincide con el registro real.)
       const facturaFields = {
         numeroFactura: form.nroFactura, montoFacturado: form.montoFacturado,
-        fechaFactura: form.fechaFactura, fechaEntrega: form.fechaEntrega, notas: form.notas,
+        fechaFactura: form.fechaFactura, condicionPago: form.condicionPago,
+        fechaCobroEsperada: form.fechaCobroEsperada, fechaEntrega: form.fechaEntrega, notas: form.notas,
       };
       const cobroFields = {
         retGanancias: form.retGanancias, retIIBB: form.retIIBB, retSuss: form.retSuss,
         retSellados: form.retSellados, montoCobrado: form.montoCobrado, medioPago: form.medioPago,
-        lugarPago: form.lugarPago, condicionPago: form.condicionPago,
-        fechaCobroEsperada: form.fechaCobroEsperada, fechaCobroReal: form.fechaCobroReal,
+        lugarPago: form.lugarPago, fechaCobroReal: form.fechaCobroReal,
         fechaCobroCheque: form.fechaCobroCheque, notas: form.notas,
       };
       if (editing._facturaRow) await gasV2.updateFactura(editing._facturaRow, facturaFields);

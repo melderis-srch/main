@@ -379,6 +379,7 @@ function mapFactura(r) {
   return {
     _row: r._row, casoId: r.casoId || '', numeroFactura: String(r.numeroFactura || ''),
     montoFacturado: parseMoney(r.montoFacturado), fechaFactura: toISO(r.fechaFactura),
+    condicionPago: r.condicionPago || '', fechaCobroEsperada: toISO(r.fechaCobroEsperada),
     fechaEntrega: toISO(r.fechaEntrega), notas: r.notas || ''
   };
 }
@@ -559,7 +560,8 @@ function addFactura(data) {
   appendObject(SHEETS.facturas, {
     casoId: data.casoId, numeroFactura: data.numeroFactura || '',
     montoFacturado: requireMoney('monto facturado', data.montoFacturado),
-    fechaFactura: data.fechaFactura || '', fechaEntrega: data.fechaEntrega || '',
+    fechaFactura: data.fechaFactura || '', condicionPago: data.condicionPago || '',
+    fechaCobroEsperada: data.fechaCobroEsperada || '', fechaEntrega: data.fechaEntrega || '',
     notas: data.notas || ''
   });
   return { appended: true };
@@ -609,7 +611,9 @@ function registrarCobroCompleto(data) {
       appendObject(SHEETS.facturas, {
         casoId: casoId, numeroFactura: data.nroFactura || '',
         montoFacturado: requireMoney('monto facturado', data.montoFacturado),
-        fechaFactura: data.fechaFactura || '', fechaEntrega: data.fechaEntrega || '', notas: data.notas || ''
+        fechaFactura: data.fechaFactura || '', condicionPago: data.condicionPago || '',
+        fechaCobroEsperada: data.fechaCobroEsperada || '',
+        fechaEntrega: data.fechaEntrega || '', notas: data.notas || ''
       });
     }
   }

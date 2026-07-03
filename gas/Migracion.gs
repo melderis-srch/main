@@ -26,7 +26,8 @@ var SCHEMA = {
     'fechaAutorizacion','condicionPago','realizada','fechaCx','observaciones','actualizadoEl'],
   Cirugias: ['casoId','mes','pedidoPresupuestado','consumo','valorImplantes','valorDescartables',
     'valorLogistica','correccionGastos','valorTotalCostos','montoPresupuesto','retencionesOtros','actualizadoEl'],
-  Facturas: ['casoId','numeroFactura','montoFacturado','fechaFactura','fechaEntrega','notas','actualizadoEl'],
+  Facturas: ['casoId','numeroFactura','montoFacturado','fechaFactura','condicionPago',
+    'fechaCobroEsperada','fechaEntrega','notas','actualizadoEl'],
   Cobros: ['cobroId','casoId','montoCobrado','retGanancias','retIIBB','retSuss','retSellados',
     'medioPago','lugarPago','condicionPago','fechaCobroEsperada','fechaCobroReal','fechaCobroCheque','notas','actualizadoEl'],
   Pagos: ['casoId','fechaEmision','nroFactura','monto','emisor','categoria','descripcion',
@@ -178,15 +179,15 @@ function migrar() {
   }
 
   // ---- VENTASCOBROS → Facturas + Cobros ----
-  // cols: 1=Pac 2=OS 3=nro 4=montoFact 5=fFact 6=retGan 7=retIIBB 8=retSell
-  //       9=montoCobrado 10=medio 11=lugar 12=cond 13=fEsper 14=fReal 15=fCheque 16=retSuss 17=fEntrega 18=notas
+  // Columnas REALES de la hoja (0-indexado):
+  //   0=Pac 1=OS 2=nro 3=montoFact 4=fFact 5=retGan 6=retIIBB 7=retSellados
+  //   8=montoCobrado 9=medio 10=lugar 11=condPago 12=fCobroEsperada 13=fCobroREAL
+  //   14=fCobroCheque 15=Pagado(bool) 16=RetSuss 17=Columna1(basura)
   //
-  // Estrategia de enlace (de más a menos confiable):
-  //   1) por Nº de factura → reusa el caso de la cirugía o de otra fila con ese Nº
-  //      (esto une "misma cirugía facturada en varias veces" = mismo caso).
+  // Enlace del caso (de más a menos confiable):
+  //   1) por Nº de factura → reusa el caso de la cirugía o de otra fila con ese Nº.
   //   2) sin Nº y con nombre ya visto → reusa ese caso.
-  //   3) si nada matchea → CREA un caso nuevo (provisional, sin fechaCx/material),
-  //      porque una factura implica que hubo cirugía. Se reporta para completar.
+  //   3) si nada matchea → CREA un caso provisional (una factura implica cirugía).
   var creadosDesdeVC = 0;
   for (var v = 1; v < oldVC.length; v++) {
     var vc = oldVC[v];
@@ -194,33 +195,37 @@ function migrar() {
     var nf = nfKey(vc[2]);
     var casoIdV = '';
     if (nf && casoByFactura[nf]) {
-      casoIdV = casoByFactura[nf];                       // (1) match por Nº factura
+      casoIdV = casoByFactura[nf];
     } else if (!nf && casoByNombre[normalizeNombre(vc[0])]) {
-      casoIdV = casoByNombre[normalizeNombre(vc[0])];    // (2) fallback por nombre
+      casoIdV = casoByNombre[normalizeNombre(vc[0])];
     } else {
-      casoIdV = pushCaso(vc[0], '', vc[1], '', '', '', vc[2]); // (3) crear provisional
+      casoIdV = pushCaso(vc[0], '', vc[1], '', '', '', vc[2]);
       creadosDesdeVC++;
       report.push(['VENTASCOBROS#' + (v + 1), vc[0], String(vc[2] || ''),
         'caso creado desde cobranza — falta cargar fechaCx / médico / material', casoIdV]);
     }
 
-    // Factura (una sola fila por Nº de factura; si no hay Nº, se vuelca igual)
+    // Factura (una por Nº). Lleva la condición y la fecha de cobro ESPERADA,
+    // porque son propiedad de la factura (cuándo se espera cobrarla).
     if (vc[2] || vc[3]) {
       var yaVolcada = nf && facturaSeen[nf];
       if (!yaVolcada) {
         facturaRows.push([casoIdV, String(vc[2] || ''), parseMoney(vc[3]),
-          parseFechaFlexible(vc[4]) || '', parseFechaFlexible(vc[16]) || '', vc[17] || '', new Date()]);
+          parseFechaFlexible(vc[4]) || '', vc[11] || '', parseFechaFlexible(vc[12]) || '',
+          '', '', new Date()]);
         if (nf) facturaSeen[nf] = true;
       }
     }
-    // Cobro: una fila por movimiento (los pagos parciales de una factura suman varios)
-    var hayCobro = vc[8] || vc[13] || vc[5] || vc[6] || vc[7] || vc[15];
-    if (hayCobro) {
+
+    // Cobro: SOLO si es un cobro real (Pagado=TRUE, o hay fecha REAL, o fecha de
+    // cheque). Si la factura está sin cobrar, NO se crea cobro → queda pendiente.
+    var cobroReal = parseBool(vc[15]) || parseFechaFlexible(vc[13]) || parseFechaFlexible(vc[14]);
+    if (cobroReal) {
       cobroRows.push([mkId('CO', 'cobro'), casoIdV, parseMoney(vc[8]),
-        parseMoney(vc[5]), parseMoney(vc[6]), parseMoney(vc[15]), parseMoney(vc[7]),
+        parseMoney(vc[5]), parseMoney(vc[6]), parseMoney(vc[16])/*RetSuss real*/, parseMoney(vc[7]),
         vc[9] || '', vc[10] || '', vc[11] || '',
         parseFechaFlexible(vc[12]) || '', parseFechaFlexible(vc[13]) || '', parseFechaFlexible(vc[14]) || '',
-        vc[17] || '', new Date()]);
+        '', new Date()]);
     }
   }
 
