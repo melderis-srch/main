@@ -150,13 +150,17 @@ export function buildPresupuestoHTML(p) {
   .brand{font-size:30px;font-weight:800;letter-spacing:-.5px;color:var(--orange);line-height:1}
   .brand span{font-style:normal}
   .brand-sub{font-size:9px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:#A08A7E;margin-top:6px}
-  .docbox{min-width:210px;background:var(--blue-tint);border:1px solid var(--blue-line);border-radius:9px;padding:12px 16px;text-align:right}
-  .docbox .lbl{font-size:10px;font-weight:800;letter-spacing:.2em;color:var(--blue)}
-  .docbox .big{font-size:22px;font-weight:800;color:var(--ink);margin-top:1px}
-  .docbox .row{display:flex;justify-content:space-between;gap:12px;font-size:11.5px;color:var(--soft);margin-top:6px}
-  .docbox .row b{color:var(--ink);font-weight:700}
-  .emisor{margin-top:16px;font-size:10.5px;color:var(--soft);line-height:1.7}
-  .emisor b{color:var(--ink);font-weight:700}
+  .docmeta{text-align:right;white-space:nowrap}
+  .docmeta .lbl{font-size:10px;font-weight:800;letter-spacing:.22em;color:var(--blue)}
+  .docmeta .big{font-size:24px;font-weight:800;color:var(--ink);margin-top:1px}
+  .docmeta .fecha{font-size:11.5px;color:var(--soft);margin-top:2px}
+  .docmeta .fecha b{color:var(--ink);font-weight:700}
+  .docmeta .noval{display:inline-block;margin-top:9px;font-size:9px;font-weight:700;letter-spacing:.06em;color:var(--faint);border:1px dashed #C7CDD6;border-radius:4px;padding:4px 9px}
+  .emisor-block{margin-top:12px;font-size:10.5px;color:var(--soft);line-height:1.6}
+  .emisor-block b{color:var(--ink);font-weight:700;font-size:11.5px}
+  .fiscal{display:flex;flex-wrap:wrap;gap:6px 26px;margin-top:14px;font-size:10.5px;color:var(--soft)}
+  .fiscal b{color:var(--ink);font-weight:700}
+  .rule{height:3px;background:var(--blue);border-radius:2px;margin:15px 0 2px}
 
   /* Tarjeta partes */
   .parties{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:0;margin-top:18px;
@@ -208,21 +212,31 @@ export function buildPresupuestoHTML(p) {
 </style></head>
 <body>
   <div class="sheet">
-    <div class="accent"></div>
     <div class="page">
       <div class="head">
-        <div>${logoHTML(logoDataUri)}</div>
-        <div class="docbox">
+        <div>
+          ${logoHTML(logoDataUri)}
+          <div class="emisor-block">
+            <b>de Cobelli Gustavo y Salami Hugo S.H.</b><br>
+            San Martín 4041 · 3000 Santa Fe · Tel/Fax (0342) 456 3173<br>
+            ventas@surcherie.com.ar
+          </div>
+        </div>
+        <div class="docmeta">
           <div class="lbl">PRESUPUESTO</div>
           <div class="big">N° ${esc(numero)}</div>
-          <div class="row"><span>Fecha</span><b>${esc(fecha)}</b></div>
+          <div class="fecha">Fecha <b>${esc(fecha)}</b></div>
+          <div class="noval">NO VÁLIDO COMO FACTURA</div>
         </div>
       </div>
 
-      <div class="emisor">
-        <b>de Cobelli Gustavo y Salami Hugo S.H.</b> &nbsp;·&nbsp; San Martín 4041, 3000 Santa Fe &nbsp;·&nbsp; Tel/Fax (0342) 456 3173 &nbsp;·&nbsp; ventas@surcherie.com.ar<br>
-        CUIT 30-70932838-3 &nbsp;·&nbsp; IVA Responsable Inscripto &nbsp;·&nbsp; Ing. Brutos CM 921-554855-1 &nbsp;·&nbsp; Inicio act. 09/2005 &nbsp;·&nbsp; <span style="color:#AAB1BC">No válido como factura</span>
+      <div class="fiscal">
+        <span><b>IVA</b> Responsable Inscripto</span>
+        <span><b>CUIT</b> 30-70932838-3</span>
+        <span><b>Ing. Brutos</b> CM 921-554855-1</span>
+        <span><b>Inicio act.</b> 01/09/2005</span>
       </div>
+      <div class="rule"></div>
 
       <div class="parties">
         <div class="party">
