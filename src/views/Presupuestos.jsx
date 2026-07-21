@@ -7,6 +7,7 @@ import { SkeletonTable, SkeletonKPI } from '../components/UI/Skeleton';
 import { formatARS, parseDate, toTitleCase, daysDiff } from '../utils/formatters';
 import { format, startOfWeek, endOfWeek } from 'date-fns';
 import { es } from 'date-fns/locale';
+import GeneradorPresupuesto from './GeneradorPresupuesto';
 
 const ORANGE = '#C05621';
 const GREEN  = '#059669';
@@ -417,18 +418,19 @@ function DetalleTab({ rows }) {
 
 /* ── Componente principal ───────────────────────────────── */
 const TABS = [
+  { id: 'generar',    label: 'Nuevo presupuesto', icon: FileText },
   { id: 'pendientes', label: 'Pendientes a gestionar', icon: PhoneCall },
   { id: 'semanal',    label: 'Resumen semanal' },
   { id: 'mensual',    label: 'Resumen mensual' },
   { id: 'detalle',    label: 'Detalle' },
 ];
 
-export default function Presupuestos({ data, loading }) {
+export default function Presupuestos({ data, loading, addToast }) {
   const { presupuestos } = data;
   const [search, setSearch] = useState('');
   const [filterMedico, setFilterMedico] = useState('');
   const [filterClasificacion, setFilterClasificacion] = useState('');
-  const [tab, setTab] = useState('pendientes');
+  const [tab, setTab] = useState('generar');
 
   const medicos = useMemo(() => [...new Set(presupuestos.map(p => p.medico).filter(Boolean))].sort(), [presupuestos]);
 
@@ -455,7 +457,7 @@ export default function Presupuestos({ data, loading }) {
 
   return (
     <div>
-      {loading
+      {tab !== 'generar' && (loading
         ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 20 }}>{Array(4).fill(0).map((_, i) => <SkeletonKPI key={i} />)}</div>
         : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 20 }}>
@@ -469,8 +471,9 @@ export default function Presupuestos({ data, loading }) {
               hint="Autorizados y con fecha de cirugía confirmada." />
           </div>
         )
-      }
+      )}
 
+      {tab !== 'generar' && (
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar paciente u obra social..."
           style={{ flex: 1, minWidth: 220, padding: '7px 12px', border: '1px solid #E5E7EB', borderRadius: 7, fontSize: 13, fontFamily: 'inherit' }} />
@@ -489,6 +492,7 @@ export default function Presupuestos({ data, loading }) {
           </select>
         )}
       </div>
+      )}
 
       <div style={{ display: 'flex', gap: 2, background: '#F3F4F6', borderRadius: 9, padding: 3, marginBottom: 20, width: 'fit-content' }}>
         {TABS.map(t => (
@@ -506,7 +510,9 @@ export default function Presupuestos({ data, loading }) {
         ))}
       </div>
 
-      {loading ? (
+      {tab === 'generar' ? (
+        <GeneradorPresupuesto data={data} addToast={addToast} />
+      ) : loading ? (
         <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 24 }}>
           <SkeletonTable rows={6} cols={6} />
         </div>
