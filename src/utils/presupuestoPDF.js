@@ -1,14 +1,15 @@
 // ============================================================
-// Generador de PDF del presupuesto (diseño v4) + cálculo de IVA
+// Generador de PDF del presupuesto (diseño profesional) + IVA
 // ============================================================
-// El PDF se arma como HTML y se abre en una ventana de impresión;
-// desde ahí se imprime o se guarda como PDF. No depende del backend.
+// Diseño sobrio tipo documento comercial: sin colores fuertes,
+// desglose por renglón y columnas Cant · Descripción · Unitario ·
+// Unit. Neto · IVA · Total. El PDF se arma como HTML y se abre en una
+// ventana de impresión (imprimir o guardar como PDF).
 // ============================================================
 
-// Alícuotas de IVA disponibles en el selector del presupuesto.
-// El precio que se carga es SIEMPRE el FINAL (con IVA incluido);
-// el desglose se calcula "hacia atrás" y de forma UNIFORME sobre el
-// total, sin mirar el gravado producto por producto (decisión de negocio).
+// Alícuotas de IVA. El precio cargado es SIEMPRE el FINAL (con IVA);
+// el desglose se calcula "hacia atrás" y de forma UNIFORME (misma
+// alícuota para todo el presupuesto).
 export const ALICUOTAS = [
   { id: 'ri21',   label: 'Responsable Inscripto 21%',   rate: 0.21,  condicion: 'Responsable Inscripto' },
   { id: 'ri105',  label: 'Responsable Inscripto 10,5%', rate: 0.105, condicion: 'Responsable Inscripto' },
@@ -27,14 +28,11 @@ export function fmtMoney(n) {
   return num.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-// Calcula totales del presupuesto a partir de los renglones y la alícuota.
-// Cada renglón: { cantidad, precioUnitario } con precioUnitario = precio FINAL.
+// Totales del presupuesto. precioUnitario = precio FINAL (con IVA).
 export function calcularTotales(items, alicuotaId) {
   const alic = alicuotaById(alicuotaId);
   const total = items.reduce((s, it) => {
-    const cant = Number(it.cantidad) || 0;
-    const pu = Number(it.precioUnitario) || 0;
-    return s + cant * pu;
+    return s + (Number(it.cantidad) || 0) * (Number(it.precioUnitario) || 0);
   }, 0);
   const neto = alic.rate > 0 ? total / (1 + alic.rate) : total;
   const iva = total - neto;
@@ -46,205 +44,219 @@ function esc(s) {
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-// Construye el HTML completo del presupuesto (diseño v4).
+// ── Número a letras (español, para la línea "Son:") ──
+function numeroALetras(num) {
+  const n = Math.floor(Math.abs(Number(num) || 0));
+  if (n === 0) return 'CERO';
+  const UNI = ['', 'UNO', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS', 'SIETE', 'OCHO', 'NUEVE',
+    'DIEZ', 'ONCE', 'DOCE', 'TRECE', 'CATORCE', 'QUINCE', 'DIECISEIS', 'DIECISIETE', 'DIECIOCHO', 'DIECINUEVE',
+    'VEINTE', 'VEINTIUNO', 'VEINTIDOS', 'VEINTITRES', 'VEINTICUATRO', 'VEINTICINCO', 'VEINTISEIS', 'VEINTISIETE', 'VEINTIOCHO', 'VEINTINUEVE'];
+  const DEC = ['', '', '', 'TREINTA', 'CUARENTA', 'CINCUENTA', 'SESENTA', 'SETENTA', 'OCHENTA', 'NOVENTA'];
+  const CEN = ['', 'CIENTO', 'DOSCIENTOS', 'TRESCIENTOS', 'CUATROCIENTOS', 'QUINIENTOS', 'SEISCIENTOS', 'SETECIENTOS', 'OCHOCIENTOS', 'NOVECIENTOS'];
+  function menor1000(x) {
+    if (x === 0) return '';
+    if (x === 100) return 'CIEN';
+    let out = '';
+    const c = Math.floor(x / 100), resto = x % 100;
+    if (c) out += CEN[c] + ' ';
+    if (resto < 30) out += UNI[resto];
+    else {
+      const d = Math.floor(resto / 10), u = resto % 10;
+      out += DEC[d] + (u ? ' Y ' + UNI[u] : '');
+    }
+    return out.trim();
+  }
+  let out = '';
+  const millones = Math.floor(n / 1000000);
+  const miles = Math.floor((n % 1000000) / 1000);
+  const resto = n % 1000;
+  if (millones) out += (millones === 1 ? 'UN MILLON' : menor1000(millones) + ' MILLONES') + ' ';
+  if (miles) out += (miles === 1 ? 'MIL' : menor1000(miles) + ' MIL') + ' ';
+  if (resto) out += menor1000(resto);
+  return out.trim();
+}
+
+// Construye el HTML completo del presupuesto (diseño profesional).
 export function buildPresupuestoHTML(p) {
   const {
     numero, fecha, cliente, cirugia, items, alicuotaId,
-    condiciones, servicioIncluido,
+    condiciones, servicioIncluido, notas,
   } = p;
   const t = calcularTotales(items, alicuotaId);
-  const nItems = items.length;
-  const showIva = t.rate > 0;
+  const rate = t.rate;
+  const cond = condiciones || {};
+  const rows = items.filter((it) => it.denominacion);
 
-  const rowsHTML = items.map((it) => {
+  const rowsHTML = rows.map((it) => {
     const cant = Number(it.cantidad) || 0;
-    const pu = Number(it.precioUnitario) || 0;
-    const sub = cant * pu;
-    const sinCargo = pu === 0;
-    const meta = [];
-    if (it.marca)   meta.push(`<span class="m"><span class="k">Marca</span><span class="v">${esc(it.marca)}</span></span>`);
-    if (it.origen)  meta.push(`<span class="m"><span class="k">Origen</span><span class="v">${esc(it.origen)}</span></span>`);
-    const alt = it.alternativa
-      ? `<span class="m alt"><span class="k">Alternativa</span><span class="v">${esc(it.alternativa)}</span></span>` : '';
-    const extra = it.detalle ? `<div class="d-extra">${esc(it.detalle)}</div>` : '';
+    const unit = Number(it.precioUnitario) || 0;
+    const lineTotal = cant * unit;
+    const unitNeto = rate > 0 ? unit / (1 + rate) : unit;
+    const lineNeto = unitNeto * cant;
+    const lineIva = lineTotal - lineNeto;
+    const sinCargo = unit === 0;
+    const metaParts = [];
+    if (it.marca) metaParts.push(`MARCA: ${esc(it.marca)}`);
+    if (it.origen) metaParts.push(`ORIGEN: ${esc(it.origen)}`);
+    const metaLine = metaParts.length ? `<div class="meta">${metaParts.join('&nbsp;&nbsp;&nbsp;')}</div>` : '';
+    const altLine = it.alternativa ? `<div class="meta">ALTERNATIVA: ${esc(it.alternativa)}</div>` : '';
+    const detLine = it.detalle ? `<div class="meta">${esc(it.detalle)}</div>` : '';
     return `
       <tr>
-        <td class="c-cant">${cant.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-        <td class="c-cod">${esc(it.codigo || '')}</td>
-        <td class="c-prod">
-          <div class="d-name">${esc(it.denominacion || '')}</div>
-          ${meta.length ? `<div class="d-meta">${meta.join('')}</div>` : ''}
-          ${alt ? `<div class="d-meta">${alt}</div>` : ''}
-          ${extra}
+        <td class="c-cant">${cant}</td>
+        <td class="c-desc">
+          <div class="name">${esc(it.denominacion)}</div>
+          ${metaLine}${altLine}${detLine}
         </td>
-        <td class="c-pu">${sinCargo ? '0,00' : fmtMoney(pu)}</td>
-        <td class="c-sub ${sinCargo ? 'sincargo' : ''}">${sinCargo ? 'Sin cargo' : fmtMoney(sub)}</td>
+        <td class="num">${sinCargo ? '—' : fmtMoney(unit)}</td>
+        <td class="num">${sinCargo ? '—' : fmtMoney(unitNeto)}</td>
+        <td class="num">${sinCargo || rate === 0 ? '—' : fmtMoney(lineIva)}</td>
+        <td class="num tot">${sinCargo ? 'Sin cargo' : fmtMoney(lineTotal)}</td>
       </tr>`;
   }).join('');
 
-  const cond = condiciones || {};
-  const servicio = servicioIncluido || 'Instrumental y descartables en quirófano · Asistencia técnica de instrumentador quirúrgico en cirugía.';
+  const enLetras = 'SON ' + numeroALetras(t.total) + ' PESOS';
+  const servicio = servicioIncluido || '';
+  const notaExtra = notas || '';
 
   return `<!doctype html><html lang="es"><head><meta charset="utf-8">
 <title>Presupuesto N° ${esc(numero)}</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  :root{
-    --paper:#fff; --panel:#F5F7FB; --ink:#1B2230; --muted:#6E7686;
-    --line:#E4E8F0; --line-strong:#D2D9E6;
-    --blue:#2F55B0; --blue-soft:#E9EEFA; --blue-line:#C3D2F0; --blue-deep:#22448F;
-    --orange:#D65E29; --orange-soft:#FBECE1; --orange-line:#F1CBB0; --ok:#2E7D5B;
-  }
-  html,body{background:#fff;color:var(--ink);font-family:'Helvetica Neue',Arial,sans-serif;font-size:13px;line-height:1.4}
-  .page{max-width:820px;margin:0 auto;padding:34px 40px}
-  .head{display:flex;justify-content:space-between;align-items:flex-start}
-  .brand{font-size:34px;font-weight:800;letter-spacing:-.5px}
-  .brand .b1{color:var(--orange)} .brand .b2{color:var(--blue)}
-  .doc-meta{text-align:right}
-  .doc-meta .lbl{font-size:12px;font-weight:700;letter-spacing:.22em;color:var(--blue)}
-  .doc-meta .num{font-size:26px;font-weight:800}
-  .doc-meta .fecha{font-size:12px;color:var(--muted);margin-top:2px}
-  .noval{display:inline-block;margin-top:8px;font-size:10px;font-weight:700;letter-spacing:.08em;
-    color:var(--muted);border:1px dashed var(--line-strong);border-radius:4px;padding:4px 10px}
-  .emisor{margin-top:8px}
-  .emisor .name{font-weight:700}
-  .emisor .addr{color:#4A4740;font-size:12px}
-  .fiscal{margin-top:16px;display:flex;flex-wrap:wrap;gap:6px 22px;font-size:11.5px;color:#4A4740}
-  .fiscal b{color:var(--ink)}
-  .rule{height:3px;background:var(--blue);border-radius:2px;margin:14px 0 18px}
-  .parties{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px}
-  .card .lbl{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--blue);margin-bottom:8px}
-  .card .big{font-size:17px;font-weight:700}
-  .card .sub{font-size:12.5px;color:#4A4740;margin-top:2px}
-  .card .doc{font-size:12.5px;color:#4A4740;margin-top:6px}
-  .card .doc span{color:var(--muted)}
-  .card .pill-iva{display:inline-block;margin-top:10px;font-size:11.5px;font-weight:700;color:var(--blue);
-    background:var(--blue-soft);border:1px solid var(--blue-line);border-radius:20px;padding:3px 12px}
-  .kv{display:flex;gap:8px;font-size:12.5px;margin-top:6px}
-  .kv .k{color:var(--muted);min-width:78px} .kv .v{font-weight:700}
-  table.items{width:100%;border-collapse:collapse;margin-top:22px}
-  table.items thead th{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);
-    text-align:left;padding:0 10px 8px;border-bottom:1px solid var(--line-strong)}
-  table.items th.c-pu,table.items th.c-sub{text-align:right}
-  table.items td{padding:12px 10px;border-bottom:1px solid var(--line);vertical-align:top}
-  .c-cant{font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}
-  .c-cod{color:var(--muted);font-variant-numeric:tabular-nums}
-  .d-name{font-weight:700}
-  .d-extra{font-size:12px;color:#4A4740;margin-top:4px}
-  .d-meta{margin-top:8px;display:flex;flex-wrap:wrap;gap:4px 22px;font-size:11.5px;color:#4A4740}
-  .d-meta .m .k{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-right:7px}
-  .d-meta .m .v{color:#3D3833}
-  .d-meta .m.alt{padding-left:14px;border-left:2px solid var(--orange-line)}
-  .d-meta .m.alt .k{color:var(--orange)}
-  .c-pu,.c-sub{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
-  .c-sub{font-weight:700}
-  .c-sub.sincargo{color:var(--ok)}
-  .servicio{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-top:14px;
-    background:var(--blue-soft);border:1px solid var(--blue-line);border-left:4px solid var(--blue);
-    border-radius:8px;padding:12px 16px}
-  .servicio .sv-lbl{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--blue)}
-  .servicio .sv-txt{font-size:12px;color:#3A4360;line-height:1.4;margin-top:3px}
-  .servicio .sv-tag{font-size:11px;font-weight:700;color:var(--ok);white-space:nowrap}
-  .totales{margin-top:22px;margin-left:auto;width:340px}
-  .totales .trow{display:flex;justify-content:space-between;font-size:13px;padding:5px 0;color:#4A4740}
-  .totales .trow .v{font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink)}
-  .grand{display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding:14px 18px;
-    background:var(--blue-soft);border:1px solid var(--blue-line);border-radius:10px}
-  .grand .gl{font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--blue)}
-  .grand .gv{font-size:22px;font-weight:800;color:var(--blue-deep);font-variant-numeric:tabular-nums}
-  .cond{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:34px;padding-top:18px;border-top:1px solid var(--line)}
-  .cond .ct{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--blue);margin-bottom:4px}
-  .cond .cv{font-size:12.5px;color:#3D3833}
-  .anmat{margin-top:24px;padding-top:14px;border-top:1px solid var(--line);text-align:center;font-size:11px;color:var(--muted)}
-  @media print{.page{padding:0}}
+  html,body{background:#fff;color:#1a1a1a;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.35}
+  .page{max-width:800px;margin:0 auto;padding:30px 34px}
+  .num{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+
+  /* Encabezado */
+  .hdr{display:flex;border:1px solid #222}
+  .hdr .left{flex:1.15;padding:12px 16px;border-right:1px solid #222;text-align:center}
+  .hdr .right{flex:1;padding:12px 16px}
+  .brand{font-size:26px;font-weight:800;letter-spacing:-.5px}
+  .brand .b1{color:#C0501E}.brand .b2{color:#26467F}
+  .brand .sub{display:block;font-size:10px;font-weight:600;letter-spacing:.18em;color:#26467F;margin-top:-2px}
+  .emisor{font-size:10.5px;color:#333;margin-top:8px;line-height:1.5}
+  .emisor b{color:#111}
+  .doc-title{font-size:19px;font-weight:800;letter-spacing:.04em;text-align:center}
+  .doc-sub{font-size:10.5px;font-style:italic;text-align:center;color:#444;margin-bottom:10px}
+  .doc-line{display:flex;justify-content:space-between;font-size:13px;padding:2px 0}
+  .doc-line .k{font-weight:700}
+  .fiscal{font-size:10px;color:#444;margin-top:8px;line-height:1.6;text-align:right}
+
+  /* Partes */
+  .parties{margin-top:14px;font-size:12px}
+  .parties .row{display:flex;padding:1px 0}
+  .parties .k{width:110px;font-weight:700}
+  .parties .v{flex:1}
+
+  /* Tabla */
+  table.items{width:100%;border-collapse:collapse;margin-top:16px}
+  table.items thead th{font-size:11px;font-weight:700;text-transform:none;color:#111;
+    padding:6px 8px;border-top:1.5px solid #222;border-bottom:1.5px solid #222;text-align:left}
+  table.items thead th.num{text-align:right}
+  table.items tbody td{padding:8px 8px;border-bottom:1px solid #DADADA;vertical-align:top}
+  .c-cant{width:36px;text-align:center;font-variant-numeric:tabular-nums}
+  .c-desc .name{font-weight:700}
+  .c-desc .meta{font-size:10.5px;color:#555;margin-top:2px;letter-spacing:.01em}
+  td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  td.tot{font-weight:700}
+  .rate-badge{font-size:9.5px;color:#666;margin-left:4px}
+
+  /* Notas + totales */
+  .foot{display:flex;justify-content:space-between;align-items:flex-start;margin-top:18px;gap:20px}
+  .notas{flex:1;font-size:11px;color:#333;line-height:1.6}
+  .notas .n{font-weight:700}
+  .totbox{width:290px;border:1px solid #222}
+  .totbox .tr{display:flex;justify-content:space-between;padding:6px 12px;font-size:12px}
+  .totbox .tr .v{font-variant-numeric:tabular-nums;font-weight:600}
+  .totbox .tr.sep{border-top:1px solid #CCC}
+  .totbox .grand{border-top:1.5px solid #222;padding:9px 12px;display:flex;justify-content:space-between;align-items:center}
+  .totbox .grand .gl{font-size:12.5px;font-weight:800;letter-spacing:.06em}
+  .totbox .grand .gv{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums}
+
+  .enletras{margin-top:14px;font-size:11.5px;font-weight:700;border-top:1px solid #CCC;border-bottom:1px solid #CCC;padding:8px 0;text-transform:uppercase}
+
+  .cond{display:flex;gap:28px;margin-top:16px;font-size:11px}
+  .cond .item{display:flex;gap:8px}
+  .cond .ck{font-weight:700}
+  .servicio{margin-top:14px;font-size:11px;font-style:italic;color:#333;border-top:1px solid #EEE;padding-top:8px}
+  .anmat{margin-top:16px;font-size:10px;color:#777;text-align:center}
+  @media print{.page{padding:6px}}
 </style></head>
 <body>
   <div class="page">
-    <div class="head">
-      <div>
-        <div class="brand"><span class="b1">Surch</span><span class="b2">ĕrie</span></div>
+    <div class="hdr">
+      <div class="left">
+        <div class="brand"><span class="b1">Surch</span><span class="b2">érie</span>
+          <span class="sub">IMPLANTES QUIRÚRGICOS</span>
+        </div>
         <div class="emisor">
-          <div class="name">de Cobelli Gustavo y Salami Hugo S.H.</div>
-          <div class="addr">San Martín 4041 · 3000 Santa Fe · Tel/Fax (0342) 456 3173</div>
-          <div class="addr">ventas@surcherie.com.ar</div>
+          <b>de Cobelli Gustavo y Salami Hugo S.H.</b><br>
+          San Martín 4041 · 3000 Santa Fe · Tel/Fax (0342) 456 3173<br>
+          ventas@surcherie.com.ar<br>
+          I.V.A. Responsable Inscripto
         </div>
       </div>
-      <div class="doc-meta">
-        <div class="lbl">PRESUPUESTO</div>
-        <div class="num">N° ${esc(numero)}</div>
-        <div class="fecha">Fecha <b>${esc(fecha)}</b></div>
-        <div class="noval">NO VÁLIDO COMO FACTURA</div>
+      <div class="right">
+        <div class="doc-title">PRESUPUESTO</div>
+        <div class="doc-sub">Documento NO válido como factura</div>
+        <div class="doc-line"><span class="k">Número:</span><span>${esc(numero)}</span></div>
+        <div class="doc-line"><span class="k">Fecha:</span><span>${esc(fecha)}</span></div>
+        <div class="fiscal">
+          Inicio de Actividades: 09/2005<br>
+          C.U.I.T.: 30-70932838-3<br>
+          Ingresos Brutos: CM 921-554855-1
+        </div>
       </div>
     </div>
-
-    <div class="fiscal">
-      <span><b>IVA</b> Responsable Inscripto</span>
-      <span><b>CUIT</b> 30-70932838-3</span>
-      <span><b>Ing. Brutos</b> CM 921-554855-1</span>
-      <span><b>Inicio act.</b> 01/09/2005</span>
-    </div>
-
-    <div class="rule"></div>
 
     <div class="parties">
-      <div class="card">
-        <div class="lbl">Cliente</div>
-        <div class="big">${esc(cliente.denominacion || '—')}</div>
-        ${cliente.direccion ? `<div class="sub">${esc(cliente.direccion)}${cliente.localidad ? ' — ' + esc(cliente.localidad) : ''}</div>` : ''}
-        ${cliente.cuit ? `<div class="doc"><span>CUIT</span> &nbsp;${esc(cliente.cuit)}</div>` : ''}
-        ${cliente.condicionIva ? `<div class="pill-iva">Condición IVA: ${esc(cliente.condicionIva)}</div>` : ''}
-      </div>
-      <div class="card">
-        <div class="lbl">Cirugía</div>
-        <div class="big">${esc(cirugia.paciente || '—')}</div>
-        ${cirugia.medico ? `<div class="doc"><span>Médico</span> &nbsp;${esc(cirugia.medico)}</div>` : ''}
-      </div>
+      <div class="row"><span class="k">Señor(es):</span><span class="v">${esc(cliente.denominacion || '')}${cliente.condicionIva ? ' — ' + esc(cliente.condicionIva) : ''}</span></div>
+      <div class="row"><span class="k">Paciente:</span><span class="v">${esc(cirugia.paciente || '')}</span></div>
+      <div class="row"><span class="k">Profesional:</span><span class="v">${esc(cirugia.medico || '')}</span></div>
+      ${cliente.cuit ? `<div class="row"><span class="k">C.U.I.T.:</span><span class="v">${esc(cliente.cuit)}</span></div>` : ''}
     </div>
 
     <table class="items">
       <thead>
         <tr>
           <th class="c-cant">Cant.</th>
-          <th class="c-cod">Cód.</th>
-          <th class="c-prod">Producto</th>
-          <th class="c-pu">P. Unitario</th>
-          <th class="c-sub">Subtotal</th>
+          <th class="c-desc">Descripción</th>
+          <th class="num">Unitario</th>
+          <th class="num">Unit. Neto</th>
+          <th class="num">IVA${rate > 0 ? ' ' + (rate * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + '%' : ''}</th>
+          <th class="num">Total</th>
         </tr>
       </thead>
       <tbody>${rowsHTML}</tbody>
     </table>
 
-    ${servicio ? `
-    <div class="servicio">
-      <div>
-        <div class="sv-lbl">Servicio incluido</div>
-        <div class="sv-txt">${esc(servicio)}</div>
+    <div class="foot">
+      <div class="notas">
+        ${notaExtra ? `<div><span class="n">NOTA:</span> ${esc(notaExtra)}</div>` : ''}
+        <div><span class="n">NOTA:</span> SE FACTURARÁ SEGÚN CONSUMO.</div>
       </div>
-      <span class="sv-tag">Sin cargo</span>
-    </div>` : ''}
-
-    <div class="totales">
-      <div class="trow"><span>Subtotal (${nItems} ${nItems === 1 ? 'ítem' : 'ítems'})</span><span class="v">${fmtMoney(t.total)}</span></div>
-      ${showIva ? `
-      <div class="trow"><span>Neto gravado</span><span class="v">${fmtMoney(t.neto)}</span></div>
-      <div class="trow"><span>IVA ${(t.rate * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 })}%</span><span class="v">${fmtMoney(t.iva)}</span></div>` : ''}
-      <div class="grand"><span class="gl">Total</span><span class="gv">$ ${fmtMoney(t.total)}</span></div>
+      <div class="totbox">
+        <div class="tr"><span>Total Neto:</span><span class="v">${fmtMoney(t.neto)}</span></div>
+        <div class="tr sep"><span>IVA${rate > 0 ? ' ' + (rate * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + '%' : ''}:</span><span class="v">${fmtMoney(t.iva)}</span></div>
+        <div class="grand"><span class="gl">TOTAL:</span><span class="gv">$ ${fmtMoney(t.total)}</span></div>
+      </div>
     </div>
+
+    <div class="enletras">${esc(enLetras)}</div>
 
     <div class="cond">
-      <div><div class="ct">Plazo de entrega</div><div class="cv">${esc(cond.entrega || 'A coordinar con el cirujano interviniente.')}</div></div>
-      <div><div class="ct">Mantenimiento de la oferta</div><div class="cv">${esc(cond.validez || '15 días corridos desde la fecha.')}</div></div>
-      <div><div class="ct">Condiciones de pago</div><div class="cv">${esc(cond.pago || '30 días fecha factura.')}</div></div>
+      <div class="item"><span class="ck">Plazo de entrega:</span><span>${esc(cond.entrega || 'A convenir')}</span></div>
+      <div class="item"><span class="ck">Mant. de la oferta:</span><span>${esc(cond.validez || '10 días')}</span></div>
+      <div class="item"><span class="ck">Cond. de pago:</span><span>${esc(cond.pago || '30 días fecha factura')}</span></div>
     </div>
 
-    <div class="anmat">Establecimiento habilitado por ANMAT · Disposición N.° 9212/15 · Hoja 1 de 1</div>
+    ${servicio ? `<div class="servicio">${esc(servicio)}</div>` : ''}
+    <div class="anmat">Establecimiento habilitado por ANMAT · Disposición N.° 9212/15</div>
   </div>
 </body></html>`;
 }
 
-// Abre el presupuesto en una ventana nueva y dispara el diálogo de impresión
-// (desde ahí se guarda como PDF).
+// Abre el presupuesto en una ventana nueva y dispara la impresión.
 export function imprimirPresupuesto(p) {
   const html = buildPresupuestoHTML(p);
   const w = window.open('', '_blank');
@@ -256,6 +268,5 @@ export function imprimirPresupuesto(p) {
   w.document.write(html);
   w.document.close();
   w.focus();
-  // Pequeño delay para que renderice antes de imprimir.
   setTimeout(() => { try { w.print(); } catch (e) { /* noop */ } }, 350);
 }
