@@ -1,11 +1,11 @@
 // ============================================================
-// Generador de PDF del presupuesto (diseño minimalista) + IVA
+// Generador de PDF del presupuesto (diseño profesional) + IVA
 // ============================================================
-// Estética limpia y elegante: mucho aire, hairlines finas, sin
-// recuadros ni colores fuertes. Estructura profesional: columnas
-// Cant · Descripción · Unitario · Unit. Neto · IVA · Total, desglose
-// por renglón e importe en letras. El PDF se arma como HTML y se abre
-// en una ventana de impresión (imprimir o guardar como PDF).
+// Documento comercial claro y estructurado: encabezado con panel de
+// datos, tarjeta de cliente/paciente, tabla con encabezado marcado,
+// desglose por renglón (Cant · Descripción · Unitario · Unit. Neto ·
+// IVA · Total), total destacado e importe en letras. El PDF se arma
+// como HTML y se abre en una ventana de impresión.
 // ============================================================
 
 // Alícuotas de IVA. El precio cargado es SIEMPRE el FINAL (con IVA);
@@ -79,13 +79,13 @@ function numeroALetras(num) {
 // Logo: si p.logoDataUri está seteado, se usa esa imagen; si no, wordmark.
 function logoHTML(logoDataUri) {
   if (logoDataUri) {
-    return `<img src="${logoDataUri}" alt="Surchérie" style="height:46px;display:block">`;
+    return `<img src="${logoDataUri}" alt="Surchérie" style="height:52px;display:block">`;
   }
-  return `<div class="brand"><span class="b1">Surch</span><span class="b2">ĕrie</span></div>
+  return `<div class="brand">Surch<span>ĕ</span>rie</div>
           <div class="brand-sub">Implantes quirúrgicos</div>`;
 }
 
-// Construye el HTML completo del presupuesto (diseño minimalista).
+// Construye el HTML completo del presupuesto (diseño profesional).
 export function buildPresupuestoHTML(p) {
   const {
     numero, fecha, cliente, cirugia, items, alicuotaId,
@@ -95,8 +95,9 @@ export function buildPresupuestoHTML(p) {
   const rate = t.rate;
   const cond = condiciones || {};
   const rows = items.filter((it) => it.denominacion);
+  const ivaLbl = rate > 0 ? ' ' + (rate * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + '%' : '';
 
-  const rowsHTML = rows.map((it) => {
+  const rowsHTML = rows.map((it, i) => {
     const cant = Number(it.cantidad) || 0;
     const unit = Number(it.precioUnitario) || 0;
     const lineTotal = cant * unit;
@@ -105,160 +106,177 @@ export function buildPresupuestoHTML(p) {
     const lineIva = lineTotal - lineNeto;
     const sinCargo = unit === 0;
     const metaParts = [];
-    if (it.marca) metaParts.push(esc(it.marca));
-    if (it.origen) metaParts.push(esc(it.origen));
-    const metaLine = metaParts.length ? `<div class="meta">${metaParts.join(' · ')}</div>` : '';
-    const altLine = it.alternativa ? `<div class="meta alt">Alternativa: ${esc(it.alternativa)}</div>` : '';
+    if (it.marca) metaParts.push(`<b>Marca</b> ${esc(it.marca)}`);
+    if (it.origen) metaParts.push(`<b>Origen</b> ${esc(it.origen)}`);
+    const metaLine = metaParts.length ? `<div class="meta">${metaParts.join('&nbsp;&nbsp;·&nbsp;&nbsp;')}</div>` : '';
+    const altLine = it.alternativa ? `<div class="meta"><b>Alternativa</b> ${esc(it.alternativa)}</div>` : '';
     const detLine = it.detalle ? `<div class="meta">${esc(it.detalle)}</div>` : '';
     return `
-      <tr>
+      <tr class="${i % 2 ? 'zebra' : ''}">
         <td class="c-cant">${cant}</td>
         <td class="c-desc">
           <div class="name">${esc(it.denominacion)}</div>
           ${metaLine}${altLine}${detLine}
         </td>
         <td class="num">${sinCargo ? '—' : fmtMoney(unit)}</td>
-        <td class="num muted">${sinCargo ? '—' : fmtMoney(unitNeto)}</td>
-        <td class="num muted">${sinCargo || rate === 0 ? '—' : fmtMoney(lineIva)}</td>
-        <td class="num tot">${sinCargo ? 'Sin cargo' : fmtMoney(lineTotal)}</td>
+        <td class="num soft">${sinCargo ? '—' : fmtMoney(unitNeto)}</td>
+        <td class="num soft">${sinCargo || rate === 0 ? '—' : fmtMoney(lineIva)}</td>
+        <td class="num tot ${sinCargo ? 'sincargo' : ''}">${sinCargo ? 'Sin cargo' : fmtMoney(lineTotal)}</td>
       </tr>`;
   }).join('');
 
   const enLetras = 'Son ' + numeroALetras(t.total) + ' pesos';
   const servicio = servicioIncluido || '';
   const notaExtra = notas || '';
-  const ivaLbl = rate > 0 ? ' ' + (rate * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + '%' : '';
 
   return `<!doctype html><html lang="es"><head><meta charset="utf-8">
 <title>Presupuesto N° ${esc(numero)}</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  html,body{background:#fff;color:#22262E;font-family:'Helvetica Neue',Arial,sans-serif;font-size:12px;line-height:1.4;-webkit-font-smoothing:antialiased}
-  .page{max-width:800px;margin:0 auto;padding:46px 44px}
-  .muted{color:#8A9099}
+  :root{
+    --ink:#1F2733; --soft:#5B6472; --faint:#8A93A0;
+    --blue:#2F55B0; --blue-dark:#213E7E; --blue-tint:#EEF2FB; --blue-line:#D3DEF3;
+    --line:#E6E9EF; --zebra:#FAFBFD; --orange:#D65E29; --ok:#1F7A52;
+  }
+  html,body{background:#fff;color:var(--ink);font-family:'Helvetica Neue',Arial,sans-serif;font-size:12px;line-height:1.4;-webkit-font-smoothing:antialiased}
+  .sheet{max-width:820px;margin:0 auto}
+  .accent{height:5px;background:var(--blue)}
+  .page{padding:34px 40px 40px}
   .num{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+  .soft{color:var(--soft)}
 
   /* Encabezado */
-  .head{display:flex;justify-content:space-between;align-items:flex-start}
-  .brand{font-size:27px;font-weight:800;letter-spacing:-.5px;line-height:1}
-  .brand .b1{color:#D65E29}.brand .b2{color:#D65E29}
-  .brand-sub{font-size:9px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:#96877E;margin-top:5px}
-  .doc{text-align:right}
-  .doc .lbl{font-size:10px;font-weight:700;letter-spacing:.24em;color:#9AA0A8}
-  .doc .num-big{font-size:23px;font-weight:800;margin-top:2px}
-  .doc .fecha{font-size:12px;color:#8A9099;margin-top:2px}
-  .emisor{margin-top:14px;font-size:10.5px;color:#8A9099;line-height:1.6}
-  .hair{height:1px;background:#ECEEF1;margin:16px 0 0}
+  .head{display:flex;justify-content:space-between;align-items:flex-start;gap:24px}
+  .brand{font-size:30px;font-weight:800;letter-spacing:-.5px;color:var(--orange);line-height:1}
+  .brand span{font-style:normal}
+  .brand-sub{font-size:9px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:#A08A7E;margin-top:6px}
+  .docbox{min-width:210px;background:var(--blue-tint);border:1px solid var(--blue-line);border-radius:9px;padding:12px 16px;text-align:right}
+  .docbox .lbl{font-size:10px;font-weight:800;letter-spacing:.2em;color:var(--blue)}
+  .docbox .big{font-size:22px;font-weight:800;color:var(--ink);margin-top:1px}
+  .docbox .row{display:flex;justify-content:space-between;gap:12px;font-size:11.5px;color:var(--soft);margin-top:6px}
+  .docbox .row b{color:var(--ink);font-weight:700}
+  .emisor{margin-top:16px;font-size:10.5px;color:var(--soft);line-height:1.7}
+  .emisor b{color:var(--ink);font-weight:700}
 
-  /* Partes */
-  .parties{display:flex;gap:48px;margin-top:22px}
-  .party .k{font-size:9.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#A2A8B0;margin-bottom:5px}
-  .party .v{font-size:14px;font-weight:700}
-  .party .x{font-size:11.5px;color:#8A9099;margin-top:3px}
+  /* Tarjeta partes */
+  .parties{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:0;margin-top:18px;
+    background:var(--zebra);border:1px solid var(--line);border-radius:9px;overflow:hidden}
+  .party{padding:13px 16px;border-right:1px solid var(--line)}
+  .party:last-child{border-right:none}
+  .party .k{font-size:9.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--blue);margin-bottom:5px}
+  .party .v{font-size:14px;font-weight:700;line-height:1.25}
+  .party .x{font-size:11px;color:var(--soft);margin-top:3px}
 
   /* Tabla */
-  table.items{width:100%;border-collapse:collapse;margin-top:30px}
-  table.items thead th{font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#A2A8B0;
-    text-align:left;padding:0 0 10px;border-bottom:1px solid #E3E6EA}
+  table.items{width:100%;border-collapse:collapse;margin-top:22px}
+  table.items thead th{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--blue-dark);
+    background:var(--blue-tint);text-align:left;padding:9px 12px;border-top:1px solid var(--blue-line);border-bottom:1px solid var(--blue-line)}
   table.items thead th.num{text-align:right}
-  table.items tbody td{padding:14px 0;border-bottom:1px solid #F1F3F5;vertical-align:top}
-  td.c-cant{width:42px;font-weight:700;font-variant-numeric:tabular-nums}
-  td.c-desc{padding-right:20px}
-  .c-desc .name{font-size:13px;font-weight:700}
-  .c-desc .meta{font-size:11px;color:#8A9099;margin-top:3px}
-  .c-desc .meta.alt{color:#B4744C}
-  table.items td.num{padding-left:14px}
+  table.items thead th:first-child{border-top-left-radius:7px}
+  table.items thead th:last-child{border-top-right-radius:7px}
+  table.items tbody td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr.zebra td{background:var(--zebra)}
+  td.c-cant{width:44px;font-weight:700;text-align:center;font-variant-numeric:tabular-nums}
+  .c-desc .name{font-size:12.5px;font-weight:700}
+  .c-desc .meta{font-size:10.5px;color:var(--soft);margin-top:3px}
+  .c-desc .meta b{color:var(--faint);font-weight:700;text-transform:uppercase;font-size:9px;letter-spacing:.04em}
+  td.num{padding-left:14px}
   td.tot{font-weight:700}
-  .c-sincargo{color:#2E7D5B}
+  td.tot.sincargo{color:var(--ok)}
 
-  /* Totales */
-  .foot{display:flex;justify-content:space-between;align-items:flex-start;margin-top:26px;gap:30px}
-  .notas{flex:1;font-size:11px;color:#8A9099;line-height:1.7;padding-top:4px}
-  .notas b{color:#5A6068}
-  .totales{width:300px}
-  .totales .tr{display:flex;justify-content:space-between;padding:5px 0;font-size:12.5px;color:#6A7079}
-  .totales .tr .v{font-variant-numeric:tabular-nums;font-weight:600;color:#22262E}
-  .totales .grand{display:flex;justify-content:space-between;align-items:baseline;margin-top:8px;padding-top:12px;border-top:1.5px solid #22262E}
-  .totales .grand .gl{font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#6A7079}
-  .totales .grand .gv{font-size:21px;font-weight:800;font-variant-numeric:tabular-nums}
+  /* Pie: notas + totales */
+  .foot{display:flex;justify-content:space-between;align-items:flex-start;margin-top:22px;gap:32px}
+  .notas{flex:1;font-size:11px;color:var(--soft);line-height:1.7}
+  .notas b{color:var(--ink)}
+  .enletras{margin-top:12px;background:#F6F8FC;border:1px solid var(--line);border-radius:7px;padding:9px 12px;
+    font-size:11px;font-weight:600;color:#3A4250;text-transform:uppercase;letter-spacing:.02em}
+  .totales{width:296px;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+  .totales .tr{display:flex;justify-content:space-between;padding:9px 16px;font-size:12.5px;color:var(--soft)}
+  .totales .tr + .tr{border-top:1px solid var(--line)}
+  .totales .tr .v{font-variant-numeric:tabular-nums;font-weight:700;color:var(--ink)}
+  .totales .grand{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:var(--blue);color:#fff}
+  .totales .grand .gl{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase}
+  .totales .grand .gv{font-size:19px;font-weight:800;font-variant-numeric:tabular-nums}
 
-  .enletras{margin-top:16px;font-size:11px;font-style:italic;color:#8A9099}
-
-  .cond{display:flex;gap:40px;margin-top:34px;padding-top:18px;border-top:1px solid #ECEEF1}
-  .cond .k{font-size:9.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#A2A8B0;margin-bottom:4px}
+  /* Condiciones */
+  .cond{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:26px;padding-top:16px;border-top:1px solid var(--line)}
+  .cond .k{font-size:9.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--blue);margin-bottom:4px}
   .cond .v{font-size:12px}
-  .servicio{margin-top:18px;font-size:10.5px;font-style:italic;color:#9AA0A8}
-  .anmat{margin-top:8px;font-size:9.5px;color:#B2B7BE;text-align:center;letter-spacing:.02em}
-  @media print{.page{padding:10px}}
+  .servicio{margin-top:16px;font-size:10.5px;font-style:italic;color:var(--faint)}
+  .anmat{margin-top:8px;font-size:9.5px;color:#AAB1BC;text-align:center;letter-spacing:.02em}
+  @media print{.page{padding:22px 26px}}
 </style></head>
 <body>
-  <div class="page">
-    <div class="head">
-      <div>${logoHTML(logoDataUri)}</div>
-      <div class="doc">
-        <div class="lbl">PRESUPUESTO</div>
-        <div class="num-big">N° ${esc(numero)}</div>
-        <div class="fecha">${esc(fecha)}</div>
+  <div class="sheet">
+    <div class="accent"></div>
+    <div class="page">
+      <div class="head">
+        <div>${logoHTML(logoDataUri)}</div>
+        <div class="docbox">
+          <div class="lbl">PRESUPUESTO</div>
+          <div class="big">N° ${esc(numero)}</div>
+          <div class="row"><span>Fecha</span><b>${esc(fecha)}</b></div>
+        </div>
       </div>
-    </div>
-    <div class="emisor">
-      de Cobelli Gustavo y Salami Hugo S.H. &nbsp;·&nbsp; San Martín 4041, 3000 Santa Fe &nbsp;·&nbsp; Tel/Fax (0342) 456 3173 &nbsp;·&nbsp; ventas@surcherie.com.ar<br>
-      CUIT 30-70932838-3 &nbsp;·&nbsp; IVA Responsable Inscripto &nbsp;·&nbsp; Ing. Brutos CM 921-554855-1 &nbsp;·&nbsp; Inicio act. 09/2005 &nbsp;·&nbsp; <span style="color:#B2B7BE">No válido como factura</span>
-    </div>
-    <div class="hair"></div>
 
-    <div class="parties">
-      <div class="party">
-        <div class="k">Cliente</div>
-        <div class="v">${esc(cliente.denominacion || '—')}</div>
-        ${cliente.condicionIva ? `<div class="x">${esc(cliente.condicionIva)}</div>` : ''}
-        ${cliente.cuit ? `<div class="x">CUIT ${esc(cliente.cuit)}</div>` : ''}
+      <div class="emisor">
+        <b>de Cobelli Gustavo y Salami Hugo S.H.</b> &nbsp;·&nbsp; San Martín 4041, 3000 Santa Fe &nbsp;·&nbsp; Tel/Fax (0342) 456 3173 &nbsp;·&nbsp; ventas@surcherie.com.ar<br>
+        CUIT 30-70932838-3 &nbsp;·&nbsp; IVA Responsable Inscripto &nbsp;·&nbsp; Ing. Brutos CM 921-554855-1 &nbsp;·&nbsp; Inicio act. 09/2005 &nbsp;·&nbsp; <span style="color:#AAB1BC">No válido como factura</span>
       </div>
-      <div class="party">
-        <div class="k">Paciente</div>
-        <div class="v">${esc(cirugia.paciente || '—')}</div>
+
+      <div class="parties">
+        <div class="party">
+          <div class="k">Cliente</div>
+          <div class="v">${esc(cliente.denominacion || '—')}</div>
+          ${cliente.cuit ? `<div class="x">CUIT ${esc(cliente.cuit)}</div>` : ''}
+          ${cliente.condicionIva ? `<div class="x">${esc(cliente.condicionIva)}</div>` : ''}
+        </div>
+        <div class="party">
+          <div class="k">Paciente</div>
+          <div class="v">${esc(cirugia.paciente || '—')}</div>
+        </div>
+        <div class="party">
+          <div class="k">Profesional</div>
+          <div class="v">${esc(cirugia.medico || '—')}</div>
+        </div>
       </div>
-      <div class="party">
-        <div class="k">Profesional</div>
-        <div class="v">${esc(cirugia.medico || '—')}</div>
+
+      <table class="items">
+        <thead>
+          <tr>
+            <th class="c-cant">Cant.</th>
+            <th class="c-desc">Descripción</th>
+            <th class="num">Unitario</th>
+            <th class="num">Unit. Neto</th>
+            <th class="num">IVA${ivaLbl}</th>
+            <th class="num">Total</th>
+          </tr>
+        </thead>
+        <tbody>${rowsHTML}</tbody>
+      </table>
+
+      <div class="foot">
+        <div class="notas">
+          ${notaExtra ? `<div><b>Nota:</b> ${esc(notaExtra)}</div>` : ''}
+          <div><b>Nota:</b> Se facturará según consumo.</div>
+          <div class="enletras">${esc(enLetras)}</div>
+        </div>
+        <div class="totales">
+          <div class="tr"><span>Neto gravado</span><span class="v">${fmtMoney(t.neto)}</span></div>
+          <div class="tr"><span>IVA${ivaLbl}</span><span class="v">${fmtMoney(t.iva)}</span></div>
+          <div class="grand"><span class="gl">Total</span><span class="gv">$ ${fmtMoney(t.total)}</span></div>
+        </div>
       </div>
+
+      <div class="cond">
+        <div><div class="k">Plazo de entrega</div><div class="v">${esc(cond.entrega || 'A convenir')}</div></div>
+        <div><div class="k">Mantenimiento de la oferta</div><div class="v">${esc(cond.validez || '10 días')}</div></div>
+        <div><div class="k">Condiciones de pago</div><div class="v">${esc(cond.pago || '30 días fecha factura')}</div></div>
+      </div>
+
+      ${servicio ? `<div class="servicio">${esc(servicio)}</div>` : ''}
+      <div class="anmat">Establecimiento habilitado por ANMAT · Disposición N.° 9212/15</div>
     </div>
-
-    <table class="items">
-      <thead>
-        <tr>
-          <th class="c-cant">Cant.</th>
-          <th class="c-desc">Descripción</th>
-          <th class="num">Unitario</th>
-          <th class="num">Unit. Neto</th>
-          <th class="num">IVA${ivaLbl}</th>
-          <th class="num">Total</th>
-        </tr>
-      </thead>
-      <tbody>${rowsHTML}</tbody>
-    </table>
-
-    <div class="foot">
-      <div class="notas">
-        ${notaExtra ? `<div><b>Nota:</b> ${esc(notaExtra)}</div>` : ''}
-        <div><b>Nota:</b> Se facturará según consumo.</div>
-        <div class="enletras">${esc(enLetras)}</div>
-      </div>
-      <div class="totales">
-        <div class="tr"><span>Neto gravado</span><span class="v">${fmtMoney(t.neto)}</span></div>
-        <div class="tr"><span>IVA${ivaLbl}</span><span class="v">${fmtMoney(t.iva)}</span></div>
-        <div class="grand"><span class="gl">Total</span><span class="gv">$ ${fmtMoney(t.total)}</span></div>
-      </div>
-    </div>
-
-    <div class="cond">
-      <div><div class="k">Plazo de entrega</div><div class="v">${esc(cond.entrega || 'A convenir')}</div></div>
-      <div><div class="k">Mantenimiento de la oferta</div><div class="v">${esc(cond.validez || '10 días')}</div></div>
-      <div><div class="k">Condiciones de pago</div><div class="v">${esc(cond.pago || '30 días fecha factura')}</div></div>
-    </div>
-
-    ${servicio ? `<div class="servicio">${esc(servicio)}</div>` : ''}
-    <div class="anmat">Establecimiento habilitado por ANMAT · Disposición N.° 9212/15</div>
   </div>
 </body></html>`;
 }
