@@ -4,6 +4,7 @@ import { Plus, Trash2, Printer, Save, FileText } from 'lucide-react';
 import { CLIENTES, PRODUCTOS } from '../data/catalogos';
 import { ALICUOTAS, alicuotaById, calcularTotales, fmtMoney, imprimirPresupuesto } from '../utils/presupuestoPDF';
 import { gasV2 } from '../utils/gasClientV2';
+import { LOGO_URL } from '../data/logo';
 
 const BLUE = '#2F55B0';
 const ORANGE = '#C05621';
@@ -96,6 +97,7 @@ export default function GeneradorPresupuesto({ data, addToast }) {
       items: items.filter((it) => it.denominacion),
       alicuotaId, condiciones: cond,
       servicioIncluido: servicioOn ? servicioTxt : '',
+      logoDataUri: LOGO_URL,
     };
   }
 

@@ -98,10 +98,11 @@ function spineSVG() {
   </svg>`;
 }
 
-// Logo: si p.logoDataUri está seteado, se usa esa imagen; si no, recreación vectorial.
+// Logo: si p.logoDataUri está seteado (URL o data URI), se usa esa imagen;
+// si no, recreación vectorial.
 function logoHTML(logoDataUri) {
   if (logoDataUri) {
-    return `<img src="${logoDataUri}" alt="Surchérie" style="height:58px;display:block">`;
+    return `<img src="${logoDataUri}" alt="Surchérie" crossorigin="anonymous" style="height:64px;display:block">`;
   }
   return `<div class="logo">
       ${spineSVG()}
@@ -335,5 +336,19 @@ export function imprimirPresupuesto(p) {
   w.document.write(html);
   w.document.close();
   w.focus();
-  setTimeout(() => { try { w.print(); } catch (e) { /* noop */ } }, 350);
+  // Esperar a que carguen las imágenes (el logo viene por URL) antes de imprimir.
+  let printed = false;
+  const doPrint = () => { if (printed) return; printed = true; try { w.print(); } catch (e) { /* noop */ } };
+  const imgs = w.document.images;
+  if (imgs && imgs.length) {
+    let pending = imgs.length;
+    const one = () => { if (--pending <= 0) setTimeout(doPrint, 150); };
+    for (let i = 0; i < imgs.length; i++) {
+      if (imgs[i].complete) one();
+      else { imgs[i].onload = one; imgs[i].onerror = one; }
+    }
+    setTimeout(doPrint, 2500); // respaldo por si alguna imagen no carga
+  } else {
+    setTimeout(doPrint, 300);
+  }
 }
