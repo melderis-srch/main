@@ -42,6 +42,14 @@ export const gasV2 = {
   addFactura:    (data) => v2Post('addFactura', data),
   updateFactura: (rowIndex, fields) => v2Post('updateFactura', { rowIndex, fields }),
 
+  // Catálogos (Clientes / Productos en la maestra)
+  getCatalogos:   () => v2Get('getCatalogos'),
+  addProducto:    (data) => v2Post('addProducto', data),
+  updateProducto: (rowIndex, fields) => v2Post('updateProducto', { rowIndex, fields }),
+  addCliente:     (data) => v2Post('addCliente', data),
+  updateCliente:  (rowIndex, fields) => v2Post('updateCliente', { rowIndex, fields }),
+  importCatalogo: (data) => v2Post('importCatalogo', data),
+
   // Cirugías / presupuestos / pagos / OC (para las próximas vistas)
   addCirugia:       (data) => v2Post('addCirugia', data),
   updateCirugia:    (casoId, fields) => v2Post('updateCirugia', { casoId, fields }),

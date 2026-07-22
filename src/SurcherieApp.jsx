@@ -14,6 +14,7 @@ import Calendario from './views/Calendario';
 import Pagos from './views/Pagos';
 import Consolidado from './views/Consolidado';
 import Presupuestos from './views/Presupuestos';
+import Catalogos from './views/Catalogos';
 
 const PAGE_TITLES = {
   dashboard: 'Dashboard',
@@ -23,6 +24,8 @@ const PAGE_TITLES = {
   facturacion: 'Facturación',
   calendario: 'Calendario',
   pagos: 'Pagos / Proveedores',
+  productos: 'Productos',
+  clientes: 'Clientes',
   consolidado: 'Consolidado anual',
 };
 
@@ -54,6 +57,8 @@ export default function SurcherieApp() {
       case 'facturacion': return <Facturacion {...pageProps} />;
       case 'calendario':  return <Calendario {...pageProps} />;
       case 'pagos':       return <Pagos {...pageProps} />;
+      case 'productos':   return <Catalogos tipo="productos" addToast={addToast} />;
+      case 'clientes':    return <Catalogos tipo="clientes" addToast={addToast} />;
       case 'consolidado': return <Consolidado {...pageProps} />;
       default:            return <Dashboard {...pageProps} />;
     }

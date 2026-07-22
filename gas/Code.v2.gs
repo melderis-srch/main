@@ -29,9 +29,15 @@ var SHEETS = {
   cobros:       'Cobros',
   pagos:        'Pagos',
   ordenes:      'OrdenesCompra',
+  clientes:     'Clientes',
+  productos:    'Productos',
   usuarios:     'Usuarios',
   config:       '_config'
 };
+
+// Columnas de los catálogos (Clientes / Productos) en la maestra.
+var CLIENTES_COLS  = ['codigo', 'denominacion', 'condicionIva', 'cuit', 'direccion', 'localidad'];
+var PRODUCTOS_COLS = ['codigo', 'denominacion', 'marca', 'origen', 'alternativa', 'precio', 'gravado'];
 
 // ============================================================
 // HTTP
@@ -57,6 +63,7 @@ function doGet(e) {
     else if (action === 'getPagos')        result = getPagos();
     else if (action === 'getOrdenes')      result = getOrdenes();
     else if (action === 'getConsolidado')  result = getConsolidado();
+    else if (action === 'getCatalogos')     result = getCatalogos();
     else result = { error: 'Accion no reconocida: ' + action };
     return makeResponse({ success: true, data: result });
   } catch (err) {
@@ -84,6 +91,11 @@ function doPost(e) {
       case 'updatePago':        result = updatePago(data.rowIndex, data.fields); break;
       case 'addOrden':          result = addOrden(data); break;
       case 'updateOrden':       result = updateOrden(data.rowIndex, data.fields); break;
+      case 'addProducto':       result = addProducto(data); break;
+      case 'updateProducto':    result = updateProducto(data.rowIndex, data.fields); break;
+      case 'addCliente':        result = addCliente(data); break;
+      case 'updateCliente':     result = updateCliente(data.rowIndex, data.fields); break;
+      case 'importCatalogo':    result = importCatalogo(data); break;
       default: result = { error: 'Accion no reconocida: ' + action };
     }
     return makeResponse({ success: true, data: result });
@@ -153,6 +165,18 @@ function touch(name, rowIndex, headers) {
   var col = colOf(headers, 'actualizadoEl');
   if (col !== -1) sheet(name).getRange(rowIndex, col).setValue(new Date());
 }
+// Asegura que exista una hoja con esos encabezados; la crea si falta.
+function ensureSheet(name, headers) {
+  var ss = master();
+  var sh = ss.getSheetByName(name);
+  if (!sh) {
+    sh = ss.insertSheet(name);
+    sh.getRange(1, 1, 1, headers.length).setValues([headers]);
+  } else if (sh.getLastRow() === 0) {
+    sh.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
+  return sh;
+}
 // Asegura que exista una columna con ese encabezado; si no, la agrega al final.
 function ensureHeader(name, header) {
   var sh = sheet(name);
@@ -212,7 +236,7 @@ var DATE_FIELDS  = ['fechaCotizacion','fechaAutorizacion','fechaCx','fechaFactur
 var MONEY_FIELDS = ['precioCotizacion','precioMejora','montoFacturado','montoCobrado',
   'valorImplantes','valorDescartables','valorLogistica','correccionGastos',
   'valorTotalCostos','montoPresupuesto','retencionesOtros','retGanancias','retIIBB',
-  'retSuss','retSellados','monto','precioUnitario'];
+  'retSuss','retSellados','monto','precioUnitario','precio'];
 var BOOL_FIELDS  = ['pagado','saldado','realizada'];
 function coerceForWrite(key, value) {
   if (DATE_FIELDS.indexOf(key) !== -1)  { var d = parseFechaFlexible(value); return d || ''; }
@@ -430,6 +454,67 @@ function getCobros()       { return readSheet(SHEETS.cobros).rows.map(mapCobro);
 function getPagos()        { return readSheet(SHEETS.pagos).rows.map(mapPago); }
 function getOrdenes()      { return readSheet(SHEETS.ordenes).rows.map(mapOrden); }
 function getConsolidado()  { return getBootstrap().consolidado; }
+
+// ============================================================
+// CATÁLOGOS — Clientes y Productos (en la maestra)
+// ============================================================
+function mapCliente(r) {
+  return {
+    _row: r._row, codigo: String(r.codigo || ''), denominacion: r.denominacion || '',
+    condicionIva: r.condicionIva || '', cuit: String(r.cuit || ''),
+    direccion: r.direccion || '', localidad: r.localidad || ''
+  };
+}
+function mapProducto(r) {
+  return {
+    _row: r._row, codigo: String(r.codigo || ''), denominacion: r.denominacion || '',
+    marca: r.marca || '', origen: r.origen || '', alternativa: r.alternativa || '',
+    precio: r.precio === '' || r.precio == null ? '' : parseMoney(r.precio), gravado: r.gravado || ''
+  };
+}
+function getCatalogos() {
+  ensureSheet(SHEETS.clientes, CLIENTES_COLS);
+  ensureSheet(SHEETS.productos, PRODUCTOS_COLS);
+  return {
+    clientes: readSheet(SHEETS.clientes).rows.map(mapCliente),
+    productos: readSheet(SHEETS.productos).rows.map(mapProducto)
+  };
+}
+function addProducto(data) {
+  ensureSheet(SHEETS.productos, PRODUCTOS_COLS);
+  appendObject(SHEETS.productos, {
+    codigo: data.codigo || '', denominacion: data.denominacion || '', marca: data.marca || '',
+    origen: data.origen || '', alternativa: data.alternativa || '',
+    precio: data.precio === '' || data.precio == null ? '' : parseMoney(data.precio), gravado: data.gravado || ''
+  });
+  return { appended: true };
+}
+function updateProducto(rowIndex, fields) { writeFields(SHEETS.productos, rowIndex, fields); return { updated: rowIndex }; }
+function addCliente(data) {
+  ensureSheet(SHEETS.clientes, CLIENTES_COLS);
+  appendObject(SHEETS.clientes, {
+    codigo: data.codigo || '', denominacion: data.denominacion || '', condicionIva: data.condicionIva || '',
+    cuit: data.cuit || '', direccion: data.direccion || '', localidad: data.localidad || ''
+  });
+  return { appended: true };
+}
+function updateCliente(rowIndex, fields) { writeFields(SHEETS.clientes, rowIndex, fields); return { updated: rowIndex }; }
+
+// Carga inicial masiva del catálogo (solo si la hoja está vacía). Bulk setValues.
+function importCatalogo(data) {
+  var res = { clientes: 0, productos: 0 };
+  var shC = ensureSheet(SHEETS.clientes, CLIENTES_COLS);
+  if (shC.getLastRow() <= 1 && data.clientes && data.clientes.length) {
+    var rowsC = data.clientes.map(function (c) { return CLIENTES_COLS.map(function (k) { return c[k] !== undefined ? c[k] : ''; }); });
+    shC.getRange(2, 1, rowsC.length, CLIENTES_COLS.length).setValues(rowsC); res.clientes = rowsC.length;
+  }
+  var shP = ensureSheet(SHEETS.productos, PRODUCTOS_COLS);
+  if (shP.getLastRow() <= 1 && data.productos && data.productos.length) {
+    var rowsP = data.productos.map(function (p) { return PRODUCTOS_COLS.map(function (k) { return p[k] !== undefined ? p[k] : ''; }); });
+    shP.getRange(2, 1, rowsP.length, PRODUCTOS_COLS.length).setValues(rowsP); res.productos = rowsP.length;
+  }
+  return res;
+}
 
 // ============================================================
 // CONSOLIDADO — calculado (fuente única de métricas)
