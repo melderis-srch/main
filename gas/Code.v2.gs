@@ -362,6 +362,7 @@ function mapPresup(r) {
     fechaAutorizacion: toISO(r.fechaAutorizacion), condicionPago: r.condicionPago || '',
     realizada: parseBool(r.realizada), fechaCx: toISO(r.fechaCx),
     observaciones: r.observaciones || '',
+    datosJson: r.datosJson || '',
     clasificacion: clasificacionPresup(estado, r.fechaCx)
   };
 }
@@ -475,7 +476,10 @@ function addPresupuesto(data) {
     fechaCotizacion: data.fechaCotizacion || '', precioMejora: requireMoney('precio mejora', data.precioMejora),
     estado: estado, fechaAutorizacion: data.fechaAutorizacion || '',
     condicionPago: data.condicionPago || '', realizada: false,
-    fechaCx: data.fechaCx || '', observaciones: data.observaciones || ''
+    fechaCx: data.fechaCx || '', observaciones: data.observaciones || '',
+    // Payload completo del presupuesto (renglones, cliente, alícuota, etc.)
+    // para poder ver/regenerar/editar el PDF desde la app.
+    datosJson: data.datosJson || ''
   });
   return { presupuestoId: presupuestoId, casoId: casoId };
 }

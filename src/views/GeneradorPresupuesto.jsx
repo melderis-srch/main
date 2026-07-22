@@ -35,21 +35,29 @@ function Field({ label, children }) {
   return <div><label style={lbl}>{label}</label>{children}</div>;
 }
 
-export default function GeneradorPresupuesto({ data, addToast }) {
-  const [numero, setNumero] = useState(() => nextNumero(data?.presupuestos));
-  const [fecha, setFecha] = useState(hoyDDMMYYYY());
-  const [alicuotaId, setAlicuotaId] = useState('ri21');
+const DEF_SERVICIO = 'Instrumental y descartables en quirófano · Asistencia técnica de instrumentador quirúrgico en cirugía.';
+const DEF_COND = { entrega: 'A coordinar con el cirujano interviniente.', validez: '15 días corridos desde la fecha.', pago: '30 días fecha factura.' };
 
-  const [cliente, setCliente] = useState({ denominacion: '', cuit: '', condicionIva: '', direccion: '', localidad: '' });
-  const [cirugia, setCirugia] = useState({ paciente: '', medico: '' });
+export default function GeneradorPresupuesto({ data, addToast, onSaved, initial }) {
+  const editing = !!(initial && initial._row);
+  const [numero, setNumero] = useState(() => initial?.numero || nextNumero(data?.presupuestos));
+  const [fecha, setFecha] = useState(initial?.fecha || hoyDDMMYYYY());
+  const [alicuotaId, setAlicuotaId] = useState(initial?.alicuotaId || 'ri21');
 
-  const [items, setItems] = useState([
-    { codigo: '', denominacion: '', marca: '', origen: '', alternativa: '', cantidad: 1, precioUnitario: '' },
-  ]);
+  const [cliente, setCliente] = useState(initial?.cliente || { denominacion: '', cuit: '', condicionIva: '', direccion: '', localidad: '' });
+  const [cirugia, setCirugia] = useState(initial?.cirugia || { paciente: '', medico: '' });
 
-  const [servicioOn, setServicioOn] = useState(true);
-  const [servicioTxt, setServicioTxt] = useState('Instrumental y descartables en quirófano · Asistencia técnica de instrumentador quirúrgico en cirugía.');
-  const [cond, setCond] = useState({ entrega: 'A coordinar con el cirujano interviniente.', validez: '15 días corridos desde la fecha.', pago: '30 días fecha factura.' });
+  const [items, setItems] = useState(
+    initial?.items?.length
+      ? initial.items.map((x) => ({ codigo: '', marca: '', origen: '', alternativa: '', cantidad: 1, precioUnitario: '', ...x }))
+      : [{ codigo: '', denominacion: '', marca: '', origen: '', alternativa: '', cantidad: 1, precioUnitario: '' }]
+  );
+
+  const [servicioOn, setServicioOn] = useState(initial ? !!initial.servicioIncluido : true);
+  const [servicioTxt, setServicioTxt] = useState(initial?.servicioIncluido || DEF_SERVICIO);
+  const [cond, setCond] = useState(initial?.condiciones || DEF_COND);
+  const [notas, setNotas] = useState(initial?.notas || '');
+  const [precioMejora, setPrecioMejora] = useState(initial?.precioMejora || '');
   const [guardando, setGuardando] = useState(false);
 
   const totales = useMemo(() => calcularTotales(items, alicuotaId), [items, alicuotaId]);
@@ -91,35 +99,52 @@ export default function GeneradorPresupuesto({ data, addToast }) {
     setItems((arr) => (arr.length === 1 ? arr : arr.filter((_, idx) => idx !== i)));
   }
 
-  function payloadPDF() {
+  // Datos completos del presupuesto (se guardan en la planilla como datosJson
+  // para poder ver/regenerar/editar después).
+  function fullData() {
     return {
-      numero, fecha, cliente, cirugia,
+      numero, fecha, alicuotaId,
+      cliente, cirugia,
       items: items.filter((it) => it.denominacion),
-      alicuotaId, condiciones: cond,
       servicioIncluido: servicioOn ? servicioTxt : '',
-      logoDataUri: LOGO_URL,
+      condiciones: cond, notas, precioMejora,
     };
   }
+  function payloadPDF() {
+    return { ...fullData(), logoDataUri: LOGO_URL };
+  }
 
-  function onImprimir() {
-    if (!cliente.denominacion) { addToast?.('Elegí o cargá un cliente primero.', 'error'); return; }
-    if (!items.some((it) => it.denominacion)) { addToast?.('Agregá al menos un producto.', 'error'); return; }
+  function validar() {
+    if (!cliente.denominacion) { addToast?.('Elegí o cargá un cliente primero.', 'error'); return false; }
+    if (!items.some((it) => it.denominacion)) { addToast?.('Agregá al menos un producto.', 'error'); return false; }
+    return true;
+  }
+
+  // Vista previa: genera el PDF sin guardar.
+  function onVistaPrevia() {
+    if (!validar()) return;
     imprimirPresupuesto(payloadPDF());
   }
 
-  async function onGuardar() {
-    if (!cliente.denominacion) { addToast?.('Elegí o cargá un cliente primero.', 'error'); return; }
+  // Guarda (nuevo o edición) el registro en la planilla y genera el PDF.
+  async function onGuardarYGenerar() {
+    if (!validar()) return;
     setGuardando(true);
     try {
-      const material = items.filter((it) => it.denominacion).map((it) => it.denominacion).join(' + ');
-      await gasV2.addPresupuesto({
+      const fd = fullData();
+      const material = fd.items.map((it) => it.denominacion).join(' + ');
+      const record = {
         paciente: cirugia.paciente, medico: cirugia.medico, obraSocial: cliente.denominacion,
-        material, numeroPresupuesto: numero, precioCotizacion: totales.total, precioMejora: '',
-        fechaCotizacion: fecha, estado: 'Cotizada',
-        observaciones: `Alícuota: ${alic.label}. Neto ${fmtMoney(totales.neto)} · IVA ${fmtMoney(totales.iva)}.`,
-      });
-      addToast?.(`Presupuesto N° ${numero} guardado en la planilla.`, 'success');
-      setNumero(String(parseInt(numero, 10) + 1).padStart(8, '0'));
+        material, numeroPresupuesto: numero, precioCotizacion: totales.total,
+        precioMejora: precioMejora || '', fechaCotizacion: fecha,
+        estado: initial?.estado || 'Cotizada', condicionPago: cond.pago,
+        observaciones: notas, datosJson: JSON.stringify(fd),
+      };
+      if (editing) await gasV2.updatePresupuesto(initial._row, record);
+      else await gasV2.addPresupuesto(record);
+      addToast?.(`Presupuesto N° ${numero} ${editing ? 'actualizado' : 'guardado'} en la planilla.`, 'success');
+      imprimirPresupuesto(payloadPDF());
+      onSaved?.();
     } catch (err) {
       addToast?.('No se pudo guardar: ' + err.message, 'error');
     } finally {
@@ -264,13 +289,28 @@ export default function GeneradorPresupuesto({ data, addToast }) {
         </div>
       </div>
 
+      {/* Observaciones + Precio de mejora */}
+      <div style={card}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: BLUE, marginBottom: 12 }}>Observaciones</div>
+        <Field label="Notas / observaciones">
+          <textarea style={{ ...inp, minHeight: 70, resize: 'vertical' }} value={notas} onChange={(e) => setNotas(e.target.value)}
+            placeholder="Notas internas o aclaraciones para este presupuesto…" />
+        </Field>
+        <div style={{ marginTop: 12, maxWidth: 260 }}>
+          <Field label="Precio de mejora (opcional)">
+            <input style={inp} type="number" min="0" step="0.01" value={precioMejora}
+              onChange={(e) => setPrecioMejora(e.target.value)} placeholder="Si piden mejora de precio" />
+          </Field>
+        </div>
+      </div>
+
       {/* Acciones */}
       <div style={{ display: 'flex', gap: 10, marginTop: 8, justifyContent: 'flex-end' }}>
-        <button onClick={onGuardar} disabled={guardando} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 18px', border: '1px solid #E5E7EB', background: '#fff', color: '#374151', borderRadius: 8, fontSize: 13.5, fontWeight: 600, cursor: guardando ? 'default' : 'pointer', fontFamily: 'inherit', opacity: guardando ? 0.6 : 1 }}>
-          <Save size={16} /> {guardando ? 'Guardando…' : 'Guardar en planilla'}
+        <button onClick={onVistaPrevia} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 18px', border: '1px solid #E5E7EB', background: '#fff', color: '#374151', borderRadius: 8, fontSize: 13.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+          <Printer size={16} /> Vista previa
         </button>
-        <button onClick={onImprimir} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 20px', border: 'none', background: ORANGE, color: '#fff', borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
-          <Printer size={16} /> Imprimir / Guardar PDF
+        <button onClick={onGuardarYGenerar} disabled={guardando} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 20px', border: 'none', background: guardando ? '#9CA3AF' : ORANGE, color: '#fff', borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: guardando ? 'default' : 'pointer', fontFamily: 'inherit' }}>
+          <Save size={16} /> {guardando ? 'Guardando…' : (editing ? 'Guardar cambios y PDF' : 'Guardar y generar PDF')}
         </button>
       </div>
     </div>
