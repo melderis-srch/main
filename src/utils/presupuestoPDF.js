@@ -76,13 +76,40 @@ function numeroALetras(num) {
   return out.trim();
 }
 
-// Logo: si p.logoDataUri está seteado, se usa esa imagen; si no, wordmark.
+// Ícono de columna vertebral (vértebras azul → naranja), recreado en SVG.
+function spineSVG() {
+  const N = 9;
+  let vert = '';
+  for (let i = 0; i < N; i++) {
+    const cy = 9 + i * 8.6;
+    const cx = 26 + Math.sin(i / (N - 1) * Math.PI) * 4; // leve curva en S
+    const w = 10 - Math.abs(i - (N - 1) / 2) * 0.6;      // vértebras más anchas al centro
+    const h = 3.1;
+    // "moño" (bowtie): dos triángulos que se tocan en el centro
+    vert += `<path d="M${(cx - w).toFixed(1)},${(cy - h).toFixed(1)} L${cx.toFixed(1)},${cy.toFixed(1)} L${(cx - w).toFixed(1)},${(cy + h).toFixed(1)} Z"/>`;
+    vert += `<path d="M${(cx + w).toFixed(1)},${(cy - h).toFixed(1)} L${cx.toFixed(1)},${cy.toFixed(1)} L${(cx + w).toFixed(1)},${(cy + h).toFixed(1)} Z"/>`;
+  }
+  return `<svg width="46" height="86" viewBox="0 0 52 86" style="display:block;flex:none">
+    <defs><linearGradient id="spg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2B4C9B"/><stop offset=".42" stop-color="#3E6DB2"/>
+      <stop offset=".5" stop-color="#E0611F"/><stop offset="1" stop-color="#E0611F"/>
+    </linearGradient></defs>
+    <g fill="url(#spg)">${vert}</g>
+  </svg>`;
+}
+
+// Logo: si p.logoDataUri está seteado, se usa esa imagen; si no, recreación vectorial.
 function logoHTML(logoDataUri) {
   if (logoDataUri) {
-    return `<img src="${logoDataUri}" alt="Surchérie" style="height:52px;display:block">`;
+    return `<img src="${logoDataUri}" alt="Surchérie" style="height:58px;display:block">`;
   }
-  return `<div class="brand">Surch<span>ĕ</span>rie</div>
-          <div class="brand-sub">Implantes quirúrgicos</div>`;
+  return `<div class="logo">
+      ${spineSVG()}
+      <div>
+        <div class="brand">Surch<span>ĕ</span>rie</div>
+        <div class="brand-sub">Implantes quirúrgicos</div>
+      </div>
+    </div>`;
 }
 
 // Construye el HTML completo del presupuesto (diseño profesional).
@@ -147,9 +174,10 @@ export function buildPresupuestoHTML(p) {
 
   /* Encabezado */
   .head{display:flex;justify-content:space-between;align-items:flex-start;gap:24px}
-  .brand{font-size:30px;font-weight:800;letter-spacing:-.5px;color:var(--orange);line-height:1}
+  .logo{display:flex;align-items:center;gap:12px}
+  .brand{font-size:34px;font-weight:800;letter-spacing:-1px;color:var(--orange);line-height:1}
   .brand span{font-style:normal}
-  .brand-sub{font-size:9px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:#A08A7E;margin-top:6px}
+  .brand-sub{font-size:9px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:#7A8087;margin-top:4px}
   .docmeta{text-align:right;white-space:nowrap}
   .docmeta .lbl{font-size:10px;font-weight:800;letter-spacing:.22em;color:var(--blue)}
   .docmeta .big{font-size:24px;font-weight:800;color:var(--ink);margin-top:1px}
