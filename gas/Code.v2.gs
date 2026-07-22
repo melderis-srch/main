@@ -153,6 +153,15 @@ function touch(name, rowIndex, headers) {
   var col = colOf(headers, 'actualizadoEl');
   if (col !== -1) sheet(name).getRange(rowIndex, col).setValue(new Date());
 }
+// Asegura que exista una columna con ese encabezado; si no, la agrega al final.
+function ensureHeader(name, header) {
+  var sh = sheet(name);
+  var headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0]
+    .map(function (h) { return String(h).trim(); });
+  if (headers.indexOf(header) === -1) {
+    sh.getRange(1, sh.getLastColumn() + 1).setValue(header);
+  }
+}
 
 // ============================================================
 // HELPERS — robustez de tipos (arregla "no se lee/carga bien")
@@ -462,6 +471,7 @@ function computeConsolidado(casos, facturas, cobros, pagos) {
 // WRITE — Presupuestos + cascada (crea caso al autorizar)
 // ============================================================
 function addPresupuesto(data) {
+  ensureHeader(SHEETS.presupuestos, 'datosJson');
   var estado = normalizarEstadoPresup(data.estado);
   var presupuestoId = nextPresupId();
   var casoId = '';
@@ -485,6 +495,7 @@ function addPresupuesto(data) {
 }
 
 function updatePresupuesto(rowIndex, fields) {
+  if (fields.datosJson !== undefined) ensureHeader(SHEETS.presupuestos, 'datosJson');
   if (fields.estado !== undefined) fields.estado = normalizarEstadoPresup(fields.estado);
   writeFields(SHEETS.presupuestos, rowIndex, fields);
   // Si quedó Autorizada + fechaCx y aún no tenía caso, crearlo y linkear.
