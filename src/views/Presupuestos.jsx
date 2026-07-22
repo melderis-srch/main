@@ -522,39 +522,30 @@ export default function Presupuestos({ data, loading, addToast, refetch }) {
         )
       }
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+      {/* Resumen por mes */}
+      <div style={{ fontSize: 15, fontWeight: 700, color: '#111827', margin: '4px 0 12px' }}>Resumen por mes</div>
+      {loading
+        ? <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 24 }}><SkeletonTable rows={3} cols={4} /></div>
+        : <MensualTab presupuestos={presupuestos} />}
+
+      {/* Listado */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '28px 0 14px', flexWrap: 'wrap' }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: '#111827', marginRight: 4 }}>Listado de presupuestos</div>
+        <div style={{ flex: 1 }} />
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar paciente u obra social..."
-          style={{ flex: 1, minWidth: 220, padding: '7px 12px', border: '1px solid #E5E7EB', borderRadius: 7, fontSize: 13, fontFamily: 'inherit' }} />
+          style={{ flex: 1, minWidth: 200, maxWidth: 320, padding: '7px 12px', border: '1px solid #E5E7EB', borderRadius: 7, fontSize: 13, fontFamily: 'inherit' }} />
         <select value={filterMedico} onChange={e => setFilterMedico(e.target.value)}
           style={{ padding: '7px 12px', border: '1px solid #E5E7EB', borderRadius: 7, fontSize: 13, fontFamily: 'inherit', background: '#fff' }}>
           <option value="">Todos los médicos</option>
           {medicos.map(m => <option key={m} value={m}>{toTitleCase(m)}</option>)}
         </select>
-        {tab === 'detalle' && (
-          <select value={filterClasificacion} onChange={e => setFilterClasificacion(e.target.value)}
-            style={{ padding: '7px 12px', border: '1px solid #E5E7EB', borderRadius: 7, fontSize: 13, fontFamily: 'inherit', background: '#fff' }}>
-            <option value="">Todos los estados</option>
-            <option value="convertido">Convertido</option>
-            <option value="pendiente">Pendiente</option>
-            <option value="rechazado">Rechazado</option>
-          </select>
-        )}
-      </div>
-
-      <div style={{ display: 'flex', gap: 2, background: '#F3F4F6', borderRadius: 9, padding: 3, marginBottom: 20, width: 'fit-content' }}>
-        {TABS.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 16px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: tab === t.id ? 600 : 500, fontFamily: 'inherit',
-              background: tab === t.id ? '#fff' : 'transparent',
-              color: tab === t.id ? '#111827' : '#6B7280',
-              boxShadow: tab === t.id ? '0 1px 3px rgba(0,0,0,0.08)' : 'none' }}>
-            {t.icon && <t.icon size={13} />}
-            {t.label}
-            {t.id === 'pendientes' && kpis.pendientes.length > 0 && (
-              <span style={{ background: AMBER, color: '#fff', borderRadius: 10, padding: '1px 6px', fontSize: 10, fontWeight: 700 }}>{kpis.pendientes.length}</span>
-            )}
-          </button>
-        ))}
+        <select value={filterClasificacion} onChange={e => setFilterClasificacion(e.target.value)}
+          style={{ padding: '7px 12px', border: '1px solid #E5E7EB', borderRadius: 7, fontSize: 13, fontFamily: 'inherit', background: '#fff' }}>
+          <option value="">Todos los estados</option>
+          <option value="convertido">Convertido</option>
+          <option value="pendiente">Pendiente</option>
+          <option value="rechazado">Rechazado</option>
+        </select>
       </div>
 
       {loading ? (
@@ -562,12 +553,7 @@ export default function Presupuestos({ data, loading, addToast, refetch }) {
           <SkeletonTable rows={6} cols={6} />
         </div>
       ) : (
-        <>
-          {tab === 'pendientes' && <PendientesTab rows={pendientesFiltrados} />}
-          {tab === 'semanal' && <SemanalTab presupuestos={filtered} />}
-          {tab === 'mensual' && <MensualTab presupuestos={filtered} />}
-          {tab === 'detalle' && <DetalleTab rows={filtered} onVer={onVer} onEditar={onEditar} />}
-        </>
+        <DetalleTab rows={filtered} onVer={onVer} onEditar={onEditar} />
       )}
 
       <Modal open={gen.open} onClose={() => setGen({ open: false, initial: null })} width={1060}
