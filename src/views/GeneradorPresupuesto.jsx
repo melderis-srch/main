@@ -196,8 +196,8 @@ export default function GeneradorPresupuesto({ data, addToast }) {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, minWidth: 720 }}>
             <thead>
               <tr>
-                {['Cant.', 'Cód.', 'Producto', 'Marca', 'Origen', 'Alternativa', 'P. Unit. (final)', 'Subtotal', ''].map((h) => (
-                  <th key={h} style={{ textAlign: h === 'P. Unit. (final)' || h === 'Subtotal' ? 'right' : 'left', padding: '6px 8px', fontSize: 10.5, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.03em', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{h}</th>
+                {['Cant.', 'Cód.', 'Producto', 'Marca', 'Origen', 'Alternativa', 'P. Unit. Neto', 'Neto', ''].map((h) => (
+                  <th key={h} style={{ textAlign: h === 'P. Unit. Neto' || h === 'Neto' ? 'right' : 'left', padding: '6px 8px', fontSize: 10.5, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.03em', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>

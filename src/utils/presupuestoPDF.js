@@ -28,14 +28,15 @@ export function fmtMoney(n) {
   return num.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-// Totales del presupuesto. precioUnitario = precio FINAL (con IVA).
+// Totales del presupuesto. precioUnitario = precio NETO (sin IVA); el IVA se
+// SUMA sobre el neto (total = neto + iva).
 export function calcularTotales(items, alicuotaId) {
   const alic = alicuotaById(alicuotaId);
-  const total = items.reduce((s, it) => {
+  const neto = items.reduce((s, it) => {
     return s + (Number(it.cantidad) || 0) * (Number(it.precioUnitario) || 0);
   }, 0);
-  const neto = alic.rate > 0 ? total / (1 + alic.rate) : total;
-  const iva = total - neto;
+  const iva = neto * alic.rate;
+  const total = neto + iva;
   return { total, neto, iva, rate: alic.rate, alic };
 }
 
@@ -125,13 +126,13 @@ export function buildPresupuestoHTML(p) {
   const rows = items.filter((it) => it.denominacion);
   const ivaLbl = rate > 0 ? ' ' + (rate * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + '%' : '';
 
+  const pctLbl = rate > 0 ? (rate * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + '%' : '—';
   const rowsHTML = rows.map((it, i) => {
     const cant = Number(it.cantidad) || 0;
-    const unit = Number(it.precioUnitario) || 0;
-    const lineTotal = cant * unit;
-    const unitNeto = rate > 0 ? unit / (1 + rate) : unit;
-    const lineNeto = unitNeto * cant;
-    const lineIva = lineTotal - lineNeto;
+    const unit = Number(it.precioUnitario) || 0; // neto por unidad
+    const lineNeto = cant * unit;
+    const lineIva = lineNeto * rate;
+    const lineTotal = lineNeto + lineIva;
     const sinCargo = unit === 0;
     const metaParts = [];
     if (it.marca) metaParts.push(`<b>Marca</b> ${esc(it.marca)}`);
@@ -146,9 +147,9 @@ export function buildPresupuestoHTML(p) {
           <div class="name">${esc(it.denominacion)}</div>
           ${metaLine}${altLine}${detLine}
         </td>
-        <td class="num">${sinCargo ? '—' : fmtMoney(unit)}</td>
-        <td class="num soft">${sinCargo ? '—' : fmtMoney(unitNeto)}</td>
+        <td class="num">${sinCargo ? '—' : fmtMoney(lineNeto)}</td>
         <td class="num soft">${sinCargo || rate === 0 ? '—' : fmtMoney(lineIva)}</td>
+        <td class="num soft">${sinCargo || rate === 0 ? '—' : pctLbl}</td>
         <td class="num tot ${sinCargo ? 'sincargo' : ''}">${sinCargo ? 'Sin cargo' : fmtMoney(lineTotal)}</td>
       </tr>`;
   }).join('');
@@ -289,9 +290,9 @@ export function buildPresupuestoHTML(p) {
           <tr>
             <th class="c-cant">Cant.</th>
             <th class="c-desc">Descripción</th>
-            <th class="num">Unitario</th>
             <th class="num">Unit. Neto</th>
-            <th class="num">IVA${ivaLbl}</th>
+            <th class="num">IVA</th>
+            <th class="num">%</th>
             <th class="num">Total</th>
           </tr>
         </thead>
