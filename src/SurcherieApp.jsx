@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Sidebar, BottomNav } from './components/Layout/Sidebar';
 import { Header } from './components/Layout/Header';
 import { ToastContainer } from './components/UI/Toast';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { useGASData } from './hooks/useGASData';
 import { useToast } from './hooks/useToast';
 import Dashboard from './views/Dashboard';
@@ -86,7 +87,9 @@ export default function SurcherieApp() {
               )}
             </div>
           )}
-          {renderPage()}
+          <ErrorBoundary key={page}>
+            {renderPage()}
+          </ErrorBoundary>
         </main>
       </div>
 

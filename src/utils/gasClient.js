@@ -1,28 +1,41 @@
 const BASE_URL = process.env.NEXT_PUBLIC_GAS_URL;
 
-async function gasGet(action) {
-  if (!BASE_URL) throw new Error('VITE_GAS_URL no configurada');
-  const url = `${BASE_URL}?action=${action}`;
-  const res = await fetch(url);
+const TIMEOUT_MS = 60000;
+async function fetchJson(url, opts) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+  let res;
+  try {
+    res = await fetch(url, { ...opts, signal: ctrl.signal });
+  } catch (e) {
+    if (e.name === 'AbortError') throw new Error('El servidor tardó demasiado en responder. Reintentá.');
+    throw e;
+  } finally {
+    clearTimeout(t);
+  }
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const json = await res.json();
+  const text = await res.text();
+  let json;
+  try { json = JSON.parse(text); }
+  catch (e) { throw new Error('Respuesta inesperada del servidor (¿sesión de Google vencida?). Reintentá.'); }
   if (!json.success) throw new Error(json.error || 'Error del servidor');
   return json.data;
 }
 
+async function gasGet(action) {
+  if (!BASE_URL) throw new Error('VITE_GAS_URL no configurada');
+  return fetchJson(`${BASE_URL}?action=${action}`);
+}
+
 async function gasPost(action, data) {
   if (!BASE_URL) throw new Error('VITE_GAS_URL no configurada');
-  const res = await fetch(BASE_URL, {
+  return fetchJson(BASE_URL, {
     method: 'POST',
     // text/plain evita el preflight CORS (OPTIONS) que Apps Script no responde;
     // el backend igual parsea el body como JSON sin importar el Content-Type.
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body: JSON.stringify({ action, data }),
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const json = await res.json();
-  if (!json.success) throw new Error(json.error || 'Error del servidor');
-  return json.data;
 }
 
 export const gasClient = {

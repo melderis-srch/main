@@ -8,25 +8,40 @@
 const V2_URL = process.env.NEXT_PUBLIC_GAS_V2_URL ||
   'https://script.google.com/macros/s/AKfycbwN251VD3Fmy1Y_U7M9YAaB2SCelbNVYyMciDdUetx8QQEsonv2pPf6gkISsVnDwYaCQg/exec';
 
-async function v2Get(action) {
-  const res = await fetch(`${V2_URL}?action=${action}`);
+// Timeout para no colgarse si Apps Script tarda demasiado.
+const TIMEOUT_MS = 60000;
+async function fetchJson(url, opts) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+  let res;
+  try {
+    res = await fetch(url, { ...opts, signal: ctrl.signal });
+  } catch (e) {
+    if (e.name === 'AbortError') throw new Error('El servidor tardó demasiado en responder. Reintentá.');
+    throw e;
+  } finally {
+    clearTimeout(t);
+  }
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const json = await res.json();
+  const text = await res.text();
+  let json;
+  try { json = JSON.parse(text); }
+  catch (e) { throw new Error('Respuesta inesperada del servidor (¿sesión de Google vencida?). Reintentá.'); }
   if (!json.success) throw new Error(json.error || 'Error del servidor');
   return json.data;
 }
 
+async function v2Get(action) {
+  return fetchJson(`${V2_URL}?action=${action}`);
+}
+
 async function v2Post(action, data) {
-  const res = await fetch(V2_URL, {
+  return fetchJson(V2_URL, {
     method: 'POST',
     // text/plain evita el preflight CORS que Apps Script no responde.
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body: JSON.stringify({ action, data }),
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const json = await res.json();
-  if (!json.success) throw new Error(json.error || 'Error del servidor');
-  return json.data;
 }
 
 export const gasV2 = {
