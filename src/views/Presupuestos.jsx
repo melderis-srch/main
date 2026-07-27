@@ -11,6 +11,7 @@ import { es } from 'date-fns/locale';
 import GeneradorPresupuesto from './GeneradorPresupuesto';
 import { imprimirPresupuesto } from '../utils/presupuestoPDF';
 import { LOGO_URL } from '../data/logo';
+import { useMasterData } from '../hooks/useMasterData';
 
 // Reconstruye el estado inicial del editor a partir de una fila de presupuesto.
 // Si tiene datosJson (presupuesto completo), lo usa; si no, arma lo básico.
@@ -452,7 +453,9 @@ const TABS = [
   { id: 'detalle',    label: 'Listado' },
 ];
 
-export default function Presupuestos({ data, loading, addToast, refetch }) {
+export default function Presupuestos({ addToast }) {
+  // Lee del backend nuevo (planilla maestra), no del v1.
+  const { data, loading, refetch } = useMasterData();
   const { presupuestos } = data;
   const [search, setSearch] = useState('');
   const [filterMedico, setFilterMedico] = useState('');

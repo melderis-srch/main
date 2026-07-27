@@ -6,7 +6,7 @@
 // Si no está seteada, cae al valor por defecto de abajo (el deploy actual),
 // igual que hicimos con el módulo de recibos.
 const V2_URL = process.env.NEXT_PUBLIC_GAS_V2_URL ||
-  'https://script.google.com/macros/s/AKfycbwN251VD3Fmy1Y_U7M9YAaB2SCelbNVYyMciDdUetx8QQEsonv2pPf6gkISsVnDwYaCQg/exec';
+  'https://script.google.com/macros/s/AKfycbzBQodujTdoOfcP55amFaxYz1m5_P9M27FAAW7nmo5rVr8UP9T_SI9AZ2WXfUa4Ah7Rpg/exec';
 
 // Timeout para no colgarse si Apps Script tarda demasiado.
 const TIMEOUT_MS = 60000;
