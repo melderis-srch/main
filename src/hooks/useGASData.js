@@ -24,7 +24,12 @@ export function useGASData() {
         gasClient.getGastosPagos(),
         gasClient.getPresupuestos(),
       ]);
-      setData({ cirugias, consolidado, ventasCobros, gastosPagos, presupuestos });
+      const asArr = (x) => (Array.isArray(x) ? x : []);
+      setData({
+        cirugias: asArr(cirugias), consolidado: asArr(consolidado),
+        ventasCobros: asArr(ventasCobros), gastosPagos: asArr(gastosPagos),
+        presupuestos: asArr(presupuestos),
+      });
     } catch (err) {
       setError(err.message);
     } finally {

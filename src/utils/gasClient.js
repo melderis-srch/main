@@ -19,6 +19,11 @@ async function fetchJson(url, opts) {
   try { json = JSON.parse(text); }
   catch (e) { throw new Error('Respuesta inesperada del servidor (¿sesión de Google vencida?). Reintentá.'); }
   if (!json.success) throw new Error(json.error || 'Error del servidor');
+  // Algunos backends responden success:true pero con { error } adentro cuando
+  // no reconocen la acción. Lo tratamos como error para no romper los .forEach/.map.
+  if (json.data && !Array.isArray(json.data) && typeof json.data === 'object' && json.data.error) {
+    throw new Error(String(json.data.error));
+  }
   return json.data;
 }
 

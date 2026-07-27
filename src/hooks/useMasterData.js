@@ -19,15 +19,16 @@ export function useMasterData() {
     setError(null);
     try {
       const boot = await gasV2.getBootstrap();
+      const asArr = (x) => (Array.isArray(x) ? x : []);
       setData({
-        casos:        boot.casos || [],
-        presupuestos: boot.presupuestos || [],
-        cirugias:     boot.cirugias || [],
-        facturas:     boot.facturas || [],
-        cobros:       boot.cobros || [],
-        pagos:        boot.pagos || [],
-        ordenes:      boot.ordenes || [],
-        consolidado:  boot.consolidado || [],
+        casos:        asArr(boot.casos),
+        presupuestos: asArr(boot.presupuestos),
+        cirugias:     asArr(boot.cirugias),
+        facturas:     asArr(boot.facturas),
+        cobros:       asArr(boot.cobros),
+        pagos:        asArr(boot.pagos),
+        ordenes:      asArr(boot.ordenes),
+        consolidado:  asArr(boot.consolidado),
       });
     } catch (err) {
       setError(err.message);
