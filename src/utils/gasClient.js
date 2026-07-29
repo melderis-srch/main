@@ -1,4 +1,7 @@
-const BASE_URL = process.env.NEXT_PUBLIC_GAS_URL;
+// Backend v1 (planillas financiero/cirugías). Si no está la env var, usa esta
+// URL por defecto (el deploy del backend viejo), para no depender de Vercel.
+const BASE_URL = process.env.NEXT_PUBLIC_GAS_URL ||
+  'https://script.google.com/macros/s/AKfycbyKI1qK1uoEhPymkybzvMzYO-RId_7LPgN9DBoFKCYKqV-gk8JAKjSZanQdeYcNpI848A/exec';
 
 async function gasGet(action) {
   if (!BASE_URL) throw new Error('VITE_GAS_URL no configurada');
