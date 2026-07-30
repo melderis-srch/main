@@ -1,12 +1,34 @@
 'use client';
 import { useState, useMemo } from 'react';
-import { ChevronDown, ChevronRight, FileText, CheckCircle2, Clock, TrendingUp, AlertTriangle, PhoneCall } from 'lucide-react';
+import { ChevronDown, ChevronRight, FileText, CheckCircle2, Clock, TrendingUp, AlertTriangle, PhoneCall, Plus, Eye, Pencil } from 'lucide-react';
 import { Badge } from '../components/UI/Badge';
 import { KPICard } from '../components/UI/KPICard';
+import { Modal } from '../components/UI/Modal';
 import { SkeletonTable, SkeletonKPI } from '../components/UI/Skeleton';
 import { formatARS, parseDate, toTitleCase, daysDiff } from '../utils/formatters';
 import { format, startOfWeek, endOfWeek } from 'date-fns';
 import { es } from 'date-fns/locale';
+import GeneradorPresupuesto from './GeneradorPresupuesto';
+import { imprimirPresupuesto } from '../utils/presupuestoPDF';
+import { LOGO_URL } from '../data/logo';
+import { useMasterData } from '../hooks/useMasterData';
+
+// Reconstruye el estado inicial del editor a partir de una fila de presupuesto.
+// Si tiene datosJson (presupuesto completo), lo usa; si no, arma lo básico.
+function initialFromPresup(p) {
+  if (p.datosJson) {
+    try {
+      const fd = JSON.parse(p.datosJson);
+      return { ...fd, _row: p._row, estado: p.estado, precioMejora: p.precioMejora || fd.precioMejora || '' };
+    } catch (e) { /* cae al fallback */ }
+  }
+  return {
+    _row: p._row, estado: p.estado, numero: p.numeroPresupuesto || '', fecha: p.fechaCotizacion || '',
+    cliente: { denominacion: p.obraSocial || '', cuit: '', condicionIva: '', direccion: '', localidad: '' },
+    cirugia: { paciente: p.paciente || '', medico: p.medico || '' },
+    items: [], notas: p.observaciones || '', precioMejora: p.precioMejora || '',
+  };
+}
 
 const ORANGE = '#C05621';
 const GREEN  = '#059669';
@@ -308,8 +330,9 @@ function MensualTab({ presupuestos }) {
 }
 
 /* ── Tab: Detalle (todas las filas, agrupadas por mes) ──────── */
-function PresupuestoRow({ p }) {
+function PresupuestoRow({ p, onVer, onEditar }) {
   const [open, setOpen] = useState(false);
+  const actBtn = { display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 8px', border: '1px solid #E5E7EB', background: '#fff', borderRadius: 6, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', color: '#374151' };
   return (
     <>
       <tr onClick={() => setOpen(o => !o)}
@@ -317,11 +340,18 @@ function PresupuestoRow({ p }) {
         <td style={{ padding: '10px 12px', width: 28 }}>
           {open ? <ChevronDown size={14} color="#9CA3AF" /> : <ChevronRight size={14} color="#9CA3AF" />}
         </td>
+        <td style={{ padding: '10px 12px', fontVariantNumeric: 'tabular-nums', fontSize: 12, fontWeight: 700, color: '#1D4ED8', whiteSpace: 'nowrap' }}>{p.numeroPresupuesto || '—'}</td>
         <td style={{ padding: '10px 12px', fontWeight: 500 }}>{nombrePar(p)}</td>
         <td style={{ padding: '10px 12px', color: '#374151' }}>{toTitleCase(p.obraSocial)}</td>
         <td style={{ padding: '10px 12px', fontVariantNumeric: 'tabular-nums', fontSize: 12, color: '#9CA3AF', whiteSpace: 'nowrap' }}>{p.fechaCotizacion || '—'}</td>
         <td style={{ padding: '10px 12px', fontVariantNumeric: 'tabular-nums', fontSize: 12, fontWeight: 600, color: '#111827' }}>{formatARS(p.monto)}</td>
         <td style={{ padding: '10px 12px' }}><ClasificacionBadge c={p.clasificacion} /></td>
+        <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }} onClick={(e) => e.stopPropagation()}>
+          <button style={{ ...actBtn, opacity: p.datosJson ? 1 : 0.45, cursor: p.datosJson ? 'pointer' : 'not-allowed' }}
+            title={p.datosJson ? 'Ver / regenerar el PDF' : 'Sin datos completos (editá y guardá para regenerarlo)'}
+            onClick={() => onVer(p)}><Eye size={13} /> Ver</button>
+          <button style={{ ...actBtn, marginLeft: 6 }} title="Editar (mejora de precio, cambios)" onClick={() => onEditar(p)}><Pencil size={13} /> Editar</button>
+        </td>
       </tr>
       {open && (
         <tr style={{ borderBottom: '1px solid #F3F4F6', background: '#F8FAFC' }}>
@@ -358,7 +388,7 @@ function PresupuestoRow({ p }) {
   );
 }
 
-function MesGroup({ ym, rows, defaultOpen }) {
+function MesGroup({ ym, rows, defaultOpen, onVer, onEditar }) {
   const [open, setOpen] = useState(defaultOpen);
   const total = rows.reduce((s, p) => s + p.monto, 0);
 
@@ -378,13 +408,13 @@ function MesGroup({ ym, rows, defaultOpen }) {
           <thead>
             <tr style={{ background: '#F9FAFB' }}>
               <th style={{ width: 28 }} />
-              {['Paciente - Médico', 'Obra Social', 'F. Cotización', 'Monto', 'Estado'].map(h => (
+              {['N°', 'Paciente - Médico', 'Obra Social', 'F. Cotización', 'Monto', 'Estado', 'Acciones'].map(h => (
                 <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: '#9CA3AF', fontSize: 11, whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {rows.map((p, i) => <PresupuestoRow key={i} p={p} />)}
+            {rows.map((p, i) => <PresupuestoRow key={i} p={p} onVer={onVer} onEditar={onEditar} />)}
           </tbody>
         </table>
       )}
@@ -392,7 +422,7 @@ function MesGroup({ ym, rows, defaultOpen }) {
   );
 }
 
-function DetalleTab({ rows }) {
+function DetalleTab({ rows, onVer, onEditar }) {
   const grouped = useMemo(() => {
     const map = {};
     rows.forEach(p => {
@@ -411,7 +441,7 @@ function DetalleTab({ rows }) {
   }
 
   return grouped.map(({ ym, rows }) => (
-    <MesGroup key={ym} ym={ym} rows={rows} defaultOpen={ym === currentYM} />
+    <MesGroup key={ym} ym={ym} rows={rows} defaultOpen={ym === currentYM} onVer={onVer} onEditar={onEditar} />
   ));
 }
 
@@ -420,15 +450,28 @@ const TABS = [
   { id: 'pendientes', label: 'Pendientes a gestionar', icon: PhoneCall },
   { id: 'semanal',    label: 'Resumen semanal' },
   { id: 'mensual',    label: 'Resumen mensual' },
-  { id: 'detalle',    label: 'Detalle' },
+  { id: 'detalle',    label: 'Listado' },
 ];
 
-export default function Presupuestos({ data, loading }) {
+export default function Presupuestos({ addToast }) {
+  // Lee del backend nuevo (planilla maestra), no del v1.
+  const { data, loading, refetch } = useMasterData();
   const { presupuestos } = data;
   const [search, setSearch] = useState('');
   const [filterMedico, setFilterMedico] = useState('');
   const [filterClasificacion, setFilterClasificacion] = useState('');
   const [tab, setTab] = useState('pendientes');
+  // Modal del generador: { open, initial }. initial=null => nuevo.
+  const [gen, setGen] = useState({ open: false, initial: null });
+
+  const onNuevo = () => setGen({ open: true, initial: null });
+  const onEditar = (p) => setGen({ open: true, initial: initialFromPresup(p) });
+  const onVer = (p) => {
+    if (!p.datosJson) { addToast?.('Este presupuesto se creó sin datos completos. Editalo y guardá para poder regenerarlo.', 'error'); return; }
+    try { imprimirPresupuesto({ ...JSON.parse(p.datosJson), logoDataUri: LOGO_URL }); }
+    catch (e) { addToast?.('No se pudieron leer los datos del presupuesto.', 'error'); }
+  };
+  const onSaved = () => { setGen({ open: false, initial: null }); refetch?.(); };
 
   const medicos = useMemo(() => [...new Set(presupuestos.map(p => p.medico).filter(Boolean))].sort(), [presupuestos]);
 
@@ -455,6 +498,17 @@ export default function Presupuestos({ data, loading }) {
 
   return (
     <div>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 18 }}>
+        <div>
+          <h2 style={{ fontSize: 18, fontWeight: 800, color: '#111827', margin: 0 }}>Dashboard de Presupuestos</h2>
+          <div style={{ fontSize: 12.5, color: '#9CA3AF', marginTop: 2 }}>Seguimiento, conversión y listado. Creá o editá presupuestos desde acá.</div>
+        </div>
+        <div style={{ flex: 1 }} />
+        <button onClick={onNuevo} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 18px', border: 'none', background: '#2F55B0', color: '#fff', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 1px 3px rgba(0,0,0,0.12)' }}>
+          <Plus size={17} /> Nuevo presupuesto
+        </button>
+      </div>
+
       {loading
         ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 20 }}>{Array(4).fill(0).map((_, i) => <SkeletonKPI key={i} />)}</div>
         : (
@@ -471,39 +525,30 @@ export default function Presupuestos({ data, loading }) {
         )
       }
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+      {/* Resumen por mes */}
+      <div style={{ fontSize: 15, fontWeight: 700, color: '#111827', margin: '4px 0 12px' }}>Resumen por mes</div>
+      {loading
+        ? <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 24 }}><SkeletonTable rows={3} cols={4} /></div>
+        : <MensualTab presupuestos={presupuestos} />}
+
+      {/* Listado */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '28px 0 14px', flexWrap: 'wrap' }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: '#111827', marginRight: 4 }}>Listado de presupuestos</div>
+        <div style={{ flex: 1 }} />
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar paciente u obra social..."
-          style={{ flex: 1, minWidth: 220, padding: '7px 12px', border: '1px solid #E5E7EB', borderRadius: 7, fontSize: 13, fontFamily: 'inherit' }} />
+          style={{ flex: 1, minWidth: 200, maxWidth: 320, padding: '7px 12px', border: '1px solid #E5E7EB', borderRadius: 7, fontSize: 13, fontFamily: 'inherit' }} />
         <select value={filterMedico} onChange={e => setFilterMedico(e.target.value)}
           style={{ padding: '7px 12px', border: '1px solid #E5E7EB', borderRadius: 7, fontSize: 13, fontFamily: 'inherit', background: '#fff' }}>
           <option value="">Todos los médicos</option>
           {medicos.map(m => <option key={m} value={m}>{toTitleCase(m)}</option>)}
         </select>
-        {tab === 'detalle' && (
-          <select value={filterClasificacion} onChange={e => setFilterClasificacion(e.target.value)}
-            style={{ padding: '7px 12px', border: '1px solid #E5E7EB', borderRadius: 7, fontSize: 13, fontFamily: 'inherit', background: '#fff' }}>
-            <option value="">Todos los estados</option>
-            <option value="convertido">Convertido</option>
-            <option value="pendiente">Pendiente</option>
-            <option value="rechazado">Rechazado</option>
-          </select>
-        )}
-      </div>
-
-      <div style={{ display: 'flex', gap: 2, background: '#F3F4F6', borderRadius: 9, padding: 3, marginBottom: 20, width: 'fit-content' }}>
-        {TABS.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 16px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: tab === t.id ? 600 : 500, fontFamily: 'inherit',
-              background: tab === t.id ? '#fff' : 'transparent',
-              color: tab === t.id ? '#111827' : '#6B7280',
-              boxShadow: tab === t.id ? '0 1px 3px rgba(0,0,0,0.08)' : 'none' }}>
-            {t.icon && <t.icon size={13} />}
-            {t.label}
-            {t.id === 'pendientes' && kpis.pendientes.length > 0 && (
-              <span style={{ background: AMBER, color: '#fff', borderRadius: 10, padding: '1px 6px', fontSize: 10, fontWeight: 700 }}>{kpis.pendientes.length}</span>
-            )}
-          </button>
-        ))}
+        <select value={filterClasificacion} onChange={e => setFilterClasificacion(e.target.value)}
+          style={{ padding: '7px 12px', border: '1px solid #E5E7EB', borderRadius: 7, fontSize: 13, fontFamily: 'inherit', background: '#fff' }}>
+          <option value="">Todos los estados</option>
+          <option value="convertido">Convertido</option>
+          <option value="pendiente">Pendiente</option>
+          <option value="rechazado">Rechazado</option>
+        </select>
       </div>
 
       {loading ? (
@@ -511,13 +556,15 @@ export default function Presupuestos({ data, loading }) {
           <SkeletonTable rows={6} cols={6} />
         </div>
       ) : (
-        <>
-          {tab === 'pendientes' && <PendientesTab rows={pendientesFiltrados} />}
-          {tab === 'semanal' && <SemanalTab presupuestos={filtered} />}
-          {tab === 'mensual' && <MensualTab presupuestos={filtered} />}
-          {tab === 'detalle' && <DetalleTab rows={filtered} />}
-        </>
+        <DetalleTab rows={filtered} onVer={onVer} onEditar={onEditar} />
       )}
+
+      <Modal open={gen.open} onClose={() => setGen({ open: false, initial: null })} width={1060}
+        title={<div style={{ fontSize: 16, fontWeight: 700, color: '#111827' }}>{gen.initial ? `Editar presupuesto N° ${gen.initial.numero || ''}` : 'Nuevo presupuesto'}</div>}>
+        {gen.open && (
+          <GeneradorPresupuesto data={data} addToast={addToast} onSaved={onSaved} initial={gen.initial} />
+        )}
+      </Modal>
     </div>
   );
 }
