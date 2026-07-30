@@ -461,6 +461,7 @@ export default function Presupuestos({ addToast }) {
   const [filterMedico, setFilterMedico] = useState('');
   const [filterClasificacion, setFilterClasificacion] = useState('');
   const [subtab, setSubtab] = useState('mes');
+  const [selectedYM, setSelectedYM] = useState(() => format(new Date(), 'yyyy-MM'));
   // Modal del generador: { open, initial }. initial=null => nuevo.
   const [gen, setGen] = useState({ open: false, initial: null });
 
@@ -499,20 +500,33 @@ export default function Presupuestos({ addToast }) {
   // Métricas del MES ACTUAL: lo presupuestado (por fecha de cotización de este
   // mes) y lo autorizado (por fecha de autorización de este mes).
   const currentYM = format(new Date(), 'yyyy-MM');
-  const mesActual = useMemo(() => {
-    const enYM = (d) => { const dt = parseDate(d); return dt && format(dt, 'yyyy-MM') === currentYM; };
+
+  // Meses disponibles (según fecha de cotización o autorización), más el actual.
+  const mesesDisponibles = useMemo(() => {
+    const s = new Set([currentYM]);
+    presupuestos.forEach(p => {
+      [p.fechaCotizacion, p.fechaAutorizacion].forEach(f => {
+        const dt = parseDate(f); if (dt) s.add(format(dt, 'yyyy-MM'));
+      });
+    });
+    return Array.from(s).sort().reverse();
+  }, [presupuestos, currentYM]);
+
+  // Métricas del mes SELECCIONADO.
+  const mesSel = useMemo(() => {
+    const enYM = (d) => { const dt = parseDate(d); return dt && format(dt, 'yyyy-MM') === selectedYM; };
     const delMes = presupuestos.filter(p => enYM(p.fechaCotizacion));
     const autoriz = presupuestos.filter(p => String(p.estado || '').trim().toUpperCase() === 'AUTORIZADA' && enYM(p.fechaAutorizacion));
     return {
       presupuestadoMes: delMes.reduce((s, p) => s + p.monto, 0), nPresup: delMes.length,
       autorizadoMes: autoriz.reduce((s, p) => s + p.monto, 0), nAut: autoriz.length,
     };
-  }, [presupuestos, currentYM]);
+  }, [presupuestos, selectedYM]);
 
-  // Presupuestos cotizados este mes (para la lista del tab "Dashboard del mes").
+  // Presupuestos cotizados en el mes seleccionado (lista del tab "Dashboard del mes").
   const presupuestosMes = useMemo(() => filtered.filter(p => {
-    const dt = parseDate(p.fechaCotizacion); return dt && format(dt, 'yyyy-MM') === currentYM;
-  }), [filtered, currentYM]);
+    const dt = parseDate(p.fechaCotizacion); return dt && format(dt, 'yyyy-MM') === selectedYM;
+  }), [filtered, selectedYM]);
 
   const SUBTABS = [
     { id: 'mes', label: 'Dashboard del mes' },
@@ -569,23 +583,29 @@ export default function Presupuestos({ addToast }) {
       {/* ── Tab 1: Dashboard del mes ── */}
       {subtab === 'mes' && (
         <>
-          <div style={{ fontSize: 15, fontWeight: 700, color: '#111827', margin: '4px 0 12px' }}>
-            {ymLabel(currentYM)} <span style={{ fontSize: 13, fontWeight: 500, color: '#9CA3AF' }}>· este mes</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '4px 0 14px' }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#6B7280' }}>Mes:</span>
+            <select value={selectedYM} onChange={e => setSelectedYM(e.target.value)}
+              style={{ padding: '7px 12px', border: '1px solid #E5E7EB', borderRadius: 7, fontSize: 13.5, fontWeight: 600, fontFamily: 'inherit', background: '#fff', color: '#111827', cursor: 'pointer' }}>
+              {mesesDisponibles.map(ym => (
+                <option key={ym} value={ym}>{ymLabel(ym)}{ym === currentYM ? ' (actual)' : ''}</option>
+              ))}
+            </select>
           </div>
           {loading
             ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>{Array(3).fill(0).map((_, i) => <SkeletonKPI key={i} />)}</div>
             : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>
-                <KPICard label="Presupuestado (mes)" value={formatARS(mesActual.presupuestadoMes)} sub={`${mesActual.nPresup} presupuesto${mesActual.nPresup !== 1 ? 's' : ''}`} icon={FileText} color={ORANGE}
-                  hint="Cotizado con fecha de cotización de este mes." />
-                <KPICard label="Autorizado (mes)" value={formatARS(mesActual.autorizadoMes)} sub={`${mesActual.nAut} autorizado${mesActual.nAut !== 1 ? 's' : ''}`} icon={CheckCircle2} color={GREEN}
-                  hint="Autorizado con fecha de autorización de este mes." />
+                <KPICard label="Presupuestado" value={formatARS(mesSel.presupuestadoMes)} sub={`${mesSel.nPresup} presupuesto${mesSel.nPresup !== 1 ? 's' : ''}`} icon={FileText} color={ORANGE}
+                  hint="Cotizado con fecha de cotización del mes elegido." />
+                <KPICard label="Autorizado" value={formatARS(mesSel.autorizadoMes)} sub={`${mesSel.nAut} autorizado${mesSel.nAut !== 1 ? 's' : ''}`} icon={CheckCircle2} color={GREEN}
+                  hint="Autorizado con fecha de autorización del mes elegido." />
                 <KPICard label="Pendientes a gestionar" value={String(kpis.pendientes.length)} sub={formatARS(kpis.totalPendiente)} icon={PhoneCall} color={AMBER}
-                  hint="Cotizados sin respuesta, o autorizados sin fecha de cirugía todavía." />
+                  hint="Cotizados sin respuesta, o autorizados sin fecha de cirugía todavía (total)." />
               </div>
             )
           }
-          <div style={{ fontSize: 15, fontWeight: 700, color: '#111827', margin: '4px 0 12px' }}>Presupuestos de este mes</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: '#111827', margin: '4px 0 12px' }}>Presupuestos de {ymLabel(selectedYM)}</div>
           {loading
             ? <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 24 }}><SkeletonTable rows={5} cols={6} /></div>
             : presupuestosMes.length === 0
