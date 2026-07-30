@@ -514,7 +514,7 @@ function MonthGroup({ mes, rows, defaultOpen, onSelect }) {
       if (!da && !db) return 0;
       if (!da) return 1;
       if (!db) return -1;
-      return da - db;
+      return db - da; // más recientes primero
     });
   }, [rows]);
   const totalFact = rows.reduce((s,c) => s + parseArgMoney(c.montoFactura), 0);
@@ -617,11 +617,13 @@ export default function Cirugias({ data, loading, refetch, addToast }) {
       if (!map[key]) map[key] = [];
       map[key].push(c);
     });
-    return Object.entries(map).sort((a, b) => {
-      const ai = MONTH_ORDER.findIndex(m => a[0].toLowerCase().includes(m.toLowerCase()));
-      const bi = MONTH_ORDER.findIndex(m => b[0].toLowerCase().includes(m.toLowerCase()));
-      return bi - ai;
-    });
+    // Ordenar los meses por la fecha real (la cirugía más reciente de cada grupo),
+    // no por el texto del campo "mes" (que puede venir inconsistente o sin año).
+    const maxFecha = (arr) => arr.reduce((mx, c) => {
+      const d = parseDate(c.fechaCx); const t = d ? d.getTime() : 0;
+      return t > mx ? t : mx;
+    }, 0);
+    return Object.entries(map).sort((a, b) => maxFecha(b[1]) - maxFecha(a[1]));
   }, [filtered]);
 
   // Mes actual para expandir por defecto

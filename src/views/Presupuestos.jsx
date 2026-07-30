@@ -496,6 +496,19 @@ export default function Presupuestos({ addToast }) {
     return { convertidos, rechazados, pendientes, totalPresupuestado, totalConvertido, totalPendiente, tasaConversion };
   }, [presupuestos]);
 
+  // Métricas del MES ACTUAL: lo presupuestado (por fecha de cotización de este
+  // mes) y lo autorizado (por fecha de autorización de este mes).
+  const currentYM = format(new Date(), 'yyyy-MM');
+  const mesActual = useMemo(() => {
+    const enYM = (d) => { const dt = parseDate(d); return dt && format(dt, 'yyyy-MM') === currentYM; };
+    const delMes = presupuestos.filter(p => enYM(p.fechaCotizacion));
+    const autoriz = presupuestos.filter(p => String(p.estado || '').trim().toUpperCase() === 'AUTORIZADA' && enYM(p.fechaAutorizacion));
+    return {
+      presupuestadoMes: delMes.reduce((s, p) => s + p.monto, 0), nPresup: delMes.length,
+      autorizadoMes: autoriz.reduce((s, p) => s + p.monto, 0), nAut: autoriz.length,
+    };
+  }, [presupuestos, currentYM]);
+
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 18 }}>
@@ -509,18 +522,20 @@ export default function Presupuestos({ addToast }) {
         </button>
       </div>
 
+      {/* Mes actual */}
+      <div style={{ fontSize: 15, fontWeight: 700, color: '#111827', margin: '4px 0 12px' }}>
+        {ymLabel(currentYM)} <span style={{ fontSize: 13, fontWeight: 500, color: '#9CA3AF' }}>· este mes</span>
+      </div>
       {loading
-        ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 20 }}>{Array(4).fill(0).map((_, i) => <SkeletonKPI key={i} />)}</div>
+        ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>{Array(3).fill(0).map((_, i) => <SkeletonKPI key={i} />)}</div>
         : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>
+            <KPICard label="Presupuestado (mes)" value={formatARS(mesActual.presupuestadoMes)} sub={`${mesActual.nPresup} presupuesto${mesActual.nPresup !== 1 ? 's' : ''}`} icon={FileText} color={ORANGE}
+              hint="Cotizado con fecha de cotización de este mes." />
+            <KPICard label="Autorizado (mes)" value={formatARS(mesActual.autorizadoMes)} sub={`${mesActual.nAut} autorizado${mesActual.nAut !== 1 ? 's' : ''}`} icon={CheckCircle2} color={GREEN}
+              hint="Autorizado con fecha de autorización de este mes." />
             <KPICard label="Pendientes a gestionar" value={String(kpis.pendientes.length)} sub={formatARS(kpis.totalPendiente)} icon={PhoneCall} color={AMBER}
-              hint="Cotizados, por salir, o autorizados sin fecha de cirugía todavía. Para hacer seguimiento." />
-            <KPICard label="Tasa de conversión" value={`${kpis.tasaConversion.toFixed(0)}%`} icon={TrendingUp} color={GREEN}
-              hint="Convertidos / (convertidos + rechazados), sin contar los pendientes." />
-            <KPICard label="Monto presupuestado" value={formatARS(kpis.totalPresupuestado)} icon={FileText} color={ORANGE}
-              hint="Suma de todos los presupuestos cotizados (precio cotización + mejora)." />
-            <KPICard label="Convertidos" value={String(kpis.convertidos.length)} sub={formatARS(kpis.totalConvertido)} icon={CheckCircle2} color={GREEN}
-              hint="Autorizados y con fecha de cirugía confirmada." />
+              hint="Cotizados sin respuesta, o autorizados sin fecha de cirugía todavía." />
           </div>
         )
       }
