@@ -460,7 +460,7 @@ export default function Presupuestos({ addToast }) {
   const [search, setSearch] = useState('');
   const [filterMedico, setFilterMedico] = useState('');
   const [filterClasificacion, setFilterClasificacion] = useState('');
-  const [tab, setTab] = useState('pendientes');
+  const [subtab, setSubtab] = useState('mes');
   // Modal del generador: { open, initial }. initial=null => nuevo.
   const [gen, setGen] = useState({ open: false, initial: null });
 
@@ -509,6 +509,36 @@ export default function Presupuestos({ addToast }) {
     };
   }, [presupuestos, currentYM]);
 
+  // Presupuestos cotizados este mes (para la lista del tab "Dashboard del mes").
+  const presupuestosMes = useMemo(() => filtered.filter(p => {
+    const dt = parseDate(p.fechaCotizacion); return dt && format(dt, 'yyyy-MM') === currentYM;
+  }), [filtered, currentYM]);
+
+  const SUBTABS = [
+    { id: 'mes', label: 'Dashboard del mes' },
+    { id: 'resumen', label: 'Resumen por mes' },
+    { id: 'gestionar', label: 'Gestionar' },
+  ];
+
+  const filtrosListado = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+      <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar paciente u obra social..."
+        style={{ flex: 1, minWidth: 200, maxWidth: 340, padding: '7px 12px', border: '1px solid #E5E7EB', borderRadius: 7, fontSize: 13, fontFamily: 'inherit' }} />
+      <select value={filterMedico} onChange={e => setFilterMedico(e.target.value)}
+        style={{ padding: '7px 12px', border: '1px solid #E5E7EB', borderRadius: 7, fontSize: 13, fontFamily: 'inherit', background: '#fff' }}>
+        <option value="">Todos los médicos</option>
+        {medicos.map(m => <option key={m} value={m}>{toTitleCase(m)}</option>)}
+      </select>
+      <select value={filterClasificacion} onChange={e => setFilterClasificacion(e.target.value)}
+        style={{ padding: '7px 12px', border: '1px solid #E5E7EB', borderRadius: 7, fontSize: 13, fontFamily: 'inherit', background: '#fff' }}>
+        <option value="">Todos los estados</option>
+        <option value="convertido">Convertido</option>
+        <option value="pendiente">Pendiente</option>
+        <option value="rechazado">Rechazado</option>
+      </select>
+    </div>
+  );
+
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 18 }}>
@@ -522,56 +552,63 @@ export default function Presupuestos({ addToast }) {
         </button>
       </div>
 
-      {/* Mes actual */}
-      <div style={{ fontSize: 15, fontWeight: 700, color: '#111827', margin: '4px 0 12px' }}>
-        {ymLabel(currentYM)} <span style={{ fontSize: 13, fontWeight: 500, color: '#9CA3AF' }}>· este mes</span>
+      {/* Pestañas */}
+      <div style={{ display: 'flex', gap: 2, background: '#F3F4F6', borderRadius: 9, padding: 3, marginBottom: 22, width: 'fit-content' }}>
+        {SUBTABS.map(t => (
+          <button key={t.id} onClick={() => setSubtab(t.id)}
+            style={{ padding: '7px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit',
+              fontWeight: subtab === t.id ? 700 : 500,
+              background: subtab === t.id ? '#fff' : 'transparent',
+              color: subtab === t.id ? '#111827' : '#6B7280',
+              boxShadow: subtab === t.id ? '0 1px 3px rgba(0,0,0,0.08)' : 'none' }}>
+            {t.label}
+          </button>
+        ))}
       </div>
-      {loading
-        ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>{Array(3).fill(0).map((_, i) => <SkeletonKPI key={i} />)}</div>
-        : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>
-            <KPICard label="Presupuestado (mes)" value={formatARS(mesActual.presupuestadoMes)} sub={`${mesActual.nPresup} presupuesto${mesActual.nPresup !== 1 ? 's' : ''}`} icon={FileText} color={ORANGE}
-              hint="Cotizado con fecha de cotización de este mes." />
-            <KPICard label="Autorizado (mes)" value={formatARS(mesActual.autorizadoMes)} sub={`${mesActual.nAut} autorizado${mesActual.nAut !== 1 ? 's' : ''}`} icon={CheckCircle2} color={GREEN}
-              hint="Autorizado con fecha de autorización de este mes." />
-            <KPICard label="Pendientes a gestionar" value={String(kpis.pendientes.length)} sub={formatARS(kpis.totalPendiente)} icon={PhoneCall} color={AMBER}
-              hint="Cotizados sin respuesta, o autorizados sin fecha de cirugía todavía." />
+
+      {/* ── Tab 1: Dashboard del mes ── */}
+      {subtab === 'mes' && (
+        <>
+          <div style={{ fontSize: 15, fontWeight: 700, color: '#111827', margin: '4px 0 12px' }}>
+            {ymLabel(currentYM)} <span style={{ fontSize: 13, fontWeight: 500, color: '#9CA3AF' }}>· este mes</span>
           </div>
-        )
-      }
+          {loading
+            ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>{Array(3).fill(0).map((_, i) => <SkeletonKPI key={i} />)}</div>
+            : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>
+                <KPICard label="Presupuestado (mes)" value={formatARS(mesActual.presupuestadoMes)} sub={`${mesActual.nPresup} presupuesto${mesActual.nPresup !== 1 ? 's' : ''}`} icon={FileText} color={ORANGE}
+                  hint="Cotizado con fecha de cotización de este mes." />
+                <KPICard label="Autorizado (mes)" value={formatARS(mesActual.autorizadoMes)} sub={`${mesActual.nAut} autorizado${mesActual.nAut !== 1 ? 's' : ''}`} icon={CheckCircle2} color={GREEN}
+                  hint="Autorizado con fecha de autorización de este mes." />
+                <KPICard label="Pendientes a gestionar" value={String(kpis.pendientes.length)} sub={formatARS(kpis.totalPendiente)} icon={PhoneCall} color={AMBER}
+                  hint="Cotizados sin respuesta, o autorizados sin fecha de cirugía todavía." />
+              </div>
+            )
+          }
+          <div style={{ fontSize: 15, fontWeight: 700, color: '#111827', margin: '4px 0 12px' }}>Presupuestos de este mes</div>
+          {loading
+            ? <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 24 }}><SkeletonTable rows={5} cols={6} /></div>
+            : presupuestosMes.length === 0
+              ? <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 32, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>Todavía no hay presupuestos cargados este mes.</div>
+              : <DetalleTab rows={presupuestosMes} onVer={onVer} onEditar={onEditar} />}
+        </>
+      )}
 
-      {/* Resumen por mes */}
-      <div style={{ fontSize: 15, fontWeight: 700, color: '#111827', margin: '4px 0 12px' }}>Resumen por mes</div>
-      {loading
-        ? <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 24 }}><SkeletonTable rows={3} cols={4} /></div>
-        : <MensualTab presupuestos={presupuestos} />}
+      {/* ── Tab 2: Resumen por mes ── */}
+      {subtab === 'resumen' && (
+        loading
+          ? <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 24 }}><SkeletonTable rows={4} cols={4} /></div>
+          : <MensualTab presupuestos={presupuestos} />
+      )}
 
-      {/* Listado */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '28px 0 14px', flexWrap: 'wrap' }}>
-        <div style={{ fontSize: 15, fontWeight: 700, color: '#111827', marginRight: 4 }}>Listado de presupuestos</div>
-        <div style={{ flex: 1 }} />
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar paciente u obra social..."
-          style={{ flex: 1, minWidth: 200, maxWidth: 320, padding: '7px 12px', border: '1px solid #E5E7EB', borderRadius: 7, fontSize: 13, fontFamily: 'inherit' }} />
-        <select value={filterMedico} onChange={e => setFilterMedico(e.target.value)}
-          style={{ padding: '7px 12px', border: '1px solid #E5E7EB', borderRadius: 7, fontSize: 13, fontFamily: 'inherit', background: '#fff' }}>
-          <option value="">Todos los médicos</option>
-          {medicos.map(m => <option key={m} value={m}>{toTitleCase(m)}</option>)}
-        </select>
-        <select value={filterClasificacion} onChange={e => setFilterClasificacion(e.target.value)}
-          style={{ padding: '7px 12px', border: '1px solid #E5E7EB', borderRadius: 7, fontSize: 13, fontFamily: 'inherit', background: '#fff' }}>
-          <option value="">Todos los estados</option>
-          <option value="convertido">Convertido</option>
-          <option value="pendiente">Pendiente</option>
-          <option value="rechazado">Rechazado</option>
-        </select>
-      </div>
-
-      {loading ? (
-        <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 24 }}>
-          <SkeletonTable rows={6} cols={6} />
-        </div>
-      ) : (
-        <DetalleTab rows={filtered} onVer={onVer} onEditar={onEditar} />
+      {/* ── Tab 3: Gestionar (listado completo) ── */}
+      {subtab === 'gestionar' && (
+        <>
+          {filtrosListado}
+          {loading
+            ? <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 24 }}><SkeletonTable rows={8} cols={6} /></div>
+            : <DetalleTab rows={filtered} onVer={onVer} onEditar={onEditar} />}
+        </>
       )}
 
       <Modal open={gen.open} onClose={() => setGen({ open: false, initial: null })} width={1060}
