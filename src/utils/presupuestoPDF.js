@@ -126,7 +126,7 @@ export function buildPresupuestoHTML(p) {
   const rows = items.filter((it) => it.denominacion);
   const ivaLbl = rate > 0 ? ' ' + (rate * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + '%' : '';
 
-  const pctLbl = rate > 0 ? (rate * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + '%' : '—';
+  const pctLbl = (rate * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + '%';
   const rowsHTML = rows.map((it, i) => {
     const cant = Number(it.cantidad) || 0;
     const unit = Number(it.precioUnitario) || 0; // neto por unidad
@@ -148,8 +148,8 @@ export function buildPresupuestoHTML(p) {
           ${metaLine}${altLine}${detLine}
         </td>
         <td class="num">${sinCargo ? '—' : fmtMoney(lineNeto)}</td>
-        <td class="num soft">${sinCargo || rate === 0 ? '—' : fmtMoney(lineIva)}</td>
-        <td class="num soft">${sinCargo || rate === 0 ? '—' : pctLbl}</td>
+        <td class="num soft">${sinCargo ? '—' : fmtMoney(lineIva)}</td>
+        <td class="num soft">${sinCargo ? '—' : pctLbl}</td>
         <td class="num tot ${sinCargo ? 'sincargo' : ''}">${sinCargo ? 'Sin cargo' : fmtMoney(lineTotal)}</td>
       </tr>`;
   }).join('');
